@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Glyph Configurator</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Top toolbar -->
+  <header class="toolbar">
+    <div class="toolbar-left">
+      <div class="logo">
+        <svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="14" fill="none" stroke="#4cc8d8" stroke-width="2"/><circle cx="16" cy="16" r="6" fill="#4cc8d8"/></svg>
+        <span class="logo-text">Glyph Configurator</span>
+      </div>
+      <button id="btn-connect" class="btn btn-primary" title="Connect to Glyph in Configurator mode (hold RT2 while plugging in)">
+        <span id="connect-icon">⚡</span> <span id="connect-label">Connect</span>
+      </button>
+      <button id="btn-load" class="btn btn-secondary" disabled title="Load config from connected device">Load Config</button>
+      <button id="btn-save" class="btn btn-secondary" disabled title="Save config to connected device">Save to Device</button>
+    </div>
+    <div class="toolbar-right">
+      <button id="btn-defaults" class="btn btn-secondary" title="Reset to Glyph default profiles">Load Defaults</button>
+      <div class="file-group">
+        <span class="file-group-label">Config File</span>
+        <button id="btn-export" class="btn btn-icon" title="Export config as JSON">⬇</button>
+        <label class="btn btn-icon" title="Import config from JSON" for="file-import">⬆</label>
+        <input type="file" id="file-import" accept=".json" style="display:none">
+      </div>
+      <button id="btn-help" class="btn btn-icon" title="Help">?</button>
+    </div>
+  </header>
+
+  <!-- Status bar -->
+  <div id="status-bar" class="status-bar status-disconnected">
+    <span id="status-text">Not connected — hold RT2 while plugging in to enter Configurator mode</span>
+  </div>
+
+  <!-- Main layout -->
+  <div class="app-body">
+
+    <!-- Left sidebar: profiles -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <span class="sidebar-title">Profiles</span>
+        <span id="profile-count" class="profile-count">0 / 20</span>
+      </div>
+      <div id="profile-list" class="profile-list"></div>
+      <div class="sidebar-footer">
+        <button id="btn-add-profile" class="btn btn-full">+ New Profile</button>
+      </div>
+    </aside>
+
+    <!-- Controller canvas area -->
+    <main class="controller-area">
+      <div class="controller-wrapper">
+        <svg id="controller-svg" viewBox="0 0 140 72" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+      <div class="platform-bar">
+        <span class="platform-bar-label">Button Display Style</span>
+        <div id="platform-tabs" class="platform-tabs">
+          <button class="platform-tab active" data-platform="xbox">Xbox</button>
+          <button class="platform-tab" data-platform="playstation">PlayStation</button>
+          <button class="platform-tab" data-platform="switch">Switch</button>
+        </div>
+      </div>
+      <div id="no-profile-msg" class="no-profile-msg">
+        <p>No profile selected.</p>
+        <p>Add a profile or import a config file to get started.</p>
+      </div>
+    </main>
+
+    <!-- Right panel: profile settings -->
+    <aside class="settings-panel" id="settings-panel">
+      <div class="settings-header">
+        <span class="settings-title" id="settings-profile-name">Profile Settings</span>
+      </div>
+      <div class="settings-body" id="settings-body">
+        <div class="setting-group">
+          <label class="setting-label">Mode</label>
+          <select id="set-mode-id" class="setting-select"></select>
+        </div>
+        <div class="setting-group">
+          <label class="setting-label">Name</label>
+          <input type="text" id="set-name" class="setting-input" placeholder="Profile name">
+        </div>
+        <div class="setting-group">
+          <label class="setting-label">Backends</label>
+          <div id="set-backends" class="checkbox-group"></div>
+        </div>
+        <div class="setting-group">
+          <label class="setting-label">SOCD Pairs</label>
+          <div id="socd-list" class="socd-list"></div>
+          <button id="btn-add-socd" class="btn btn-small">+ Add SOCD Pair</button>
+        </div>
+        <div class="setting-group">
+          <label class="setting-label">Layout Plate</label>
+          <select id="set-layout-plate" class="setting-select"></select>
+        </div>
+        <div class="setting-group">
+          <label class="setting-label">Button Remapping</label>
+          <div id="remap-list" class="remap-list"></div>
+          <button id="btn-add-remap" class="btn btn-small">+ Add Remap</button>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- Button assignment modal -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <span id="modal-title" class="modal-title">Assign Button</span>
+        <button id="modal-close" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-row">
+          <span class="modal-label">Physical Button</span>
+          <span id="modal-physical" class="modal-value"></span>
+        </div>
+        <div class="modal-row">
+          <span class="modal-label">Activates</span>
+          <select id="modal-activates" class="setting-select"></select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="modal-cancel" class="btn btn-secondary">Cancel</button>
+        <button id="modal-ok" class="btn btn-primary">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Help modal -->
+  <div id="help-overlay" class="modal-overlay hidden">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <span class="modal-title">Help</span>
+        <button id="help-close" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body help-body">
+        <h3>Connecting to the Glyph</h3>
+        <ol>
+          <li>Hold <strong>RT2</strong> while plugging the Glyph into USB to enter Configurator mode.</li>
+          <li>Click <strong>Connect</strong> in the toolbar and select the Glyph serial port.</li>
+          <li>Click <strong>Load Config</strong> to read the current profiles from the device.</li>
+          <li>Edit your profiles, then click <strong>Save to Device</strong> to write the new config.</li>
+        </ol>
+        <h3>Editing Profiles</h3>
+        <ul>
+          <li>Click a button on the controller layout to assign or remap it.</li>
+          <li>Use the right panel to edit mode, backends, SOCD rules, and layout.</li>
+          <li>Buttons outlined in <span style="color:#4cc8d8">teal</span> are active in the profile.</li>
+          <li>Buttons shown as <span style="color:#e06060">red</span> are disabled (BTN_UNSPECIFIED).</li>
+          <li>Buttons shown with a <span style="color:#c8a040">gold</span> outline are remapped to another button.</li>
+        </ul>
+        <h3>Config Files</h3>
+        <p>Use <strong>Export JSON</strong> / <strong>Import JSON</strong> to save and restore configs offline.</p>
+        <p>The JSON format is compatible with the official Glyph Configurator.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
