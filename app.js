@@ -632,6 +632,120 @@ function currentProfile() {
 const DEFAULT_LED_COLOR_INT = 0x22D3EE;          // cyan accent
 const DEFAULT_LED_COLOR_HEX = '#22d3ee';
 
+// ---------------------------------------------------------------------------
+// Keyboard mode — USB HID Keyboard/Keypad Usage Page (0x07) scancodes.
+// The firmware reads `KeyboardModeConfig.buttonsToKeycodes` and emits a HID
+// keyboard report; DInput is the only backend wired to deliver it.
+// ---------------------------------------------------------------------------
+const { EVENT_CODE_TO_HID, HID_TO_LABEL } = (function () {
+  const codeToHid = {};
+  const hidToLabel = {};
+  // A-Z
+  for (let i = 0; i < 26; i++) {
+    const c = String.fromCharCode(65 + i);
+    codeToHid['Key' + c] = 4 + i;
+    hidToLabel[4 + i] = c;
+  }
+  // 1-9, 0
+  for (let i = 1; i <= 9; i++) { codeToHid['Digit' + i] = 29 + i; hidToLabel[29 + i] = String(i); }
+  codeToHid['Digit0'] = 39; hidToLabel[39] = '0';
+  // F1-F12
+  for (let i = 1; i <= 12; i++) { codeToHid['F' + i] = 57 + i; hidToLabel[57 + i] = 'F' + i; }
+  // Numpad 1-9, 0
+  for (let i = 1; i <= 9; i++) { codeToHid['Numpad' + i] = 88 + i; hidToLabel[88 + i] = 'N' + i; }
+  codeToHid['Numpad0'] = 98; hidToLabel[98] = 'N0';
+  // One-offs
+  const SPECIAL = [
+    ['Enter',         40, '↵'],   ['Escape',        41, 'ESC'],
+    ['Backspace',     42, '⌫'],   ['Tab',           43, '⇥'],
+    ['Space',         44, '␣'],   ['Minus',         45, '-'],
+    ['Equal',         46, '='],   ['BracketLeft',   47, '['],
+    ['BracketRight',  48, ']'],   ['Backslash',     49, '\\'],
+    ['Semicolon',     51, ';'],   ['Quote',         52, '\''],
+    ['Backquote',     53, '`'],   ['Comma',         54, ','],
+    ['Period',        55, '.'],   ['Slash',         56, '/'],
+    ['CapsLock',      57, 'CAPS'],['PrintScreen',   70, 'PRTSC'],
+    ['ScrollLock',    71, 'SLCK'],['Pause',         72, 'PAUSE'],
+    ['Insert',        73, 'INS'], ['Home',          74, 'HOME'],
+    ['PageUp',        75, 'PGUP'],['Delete',        76, 'DEL'],
+    ['End',           77, 'END'], ['PageDown',      78, 'PGDN'],
+    ['ArrowRight',    79, '→'],   ['ArrowLeft',     80, '←'],
+    ['ArrowDown',     81, '↓'],   ['ArrowUp',       82, '↑'],
+    ['NumLock',       83, 'NUM'], ['NumpadDivide',  84, 'N/'],
+    ['NumpadMultiply',85, 'N*'],  ['NumpadSubtract',86, 'N-'],
+    ['NumpadAdd',     87, 'N+'],  ['NumpadEnter',   88, 'N↵'],
+    ['NumpadDecimal', 99, 'N.'],
+    ['ControlLeft', 224, 'LCTRL'], ['ShiftLeft',   225, 'LSHFT'],
+    ['AltLeft',     226, 'LALT'],  ['MetaLeft',    227, 'LWIN'],
+    ['ControlRight',228, 'RCTRL'], ['ShiftRight',  229, 'RSHFT'],
+    ['AltRight',    230, 'RALT'],  ['MetaRight',   231, 'RWIN'],
+  ];
+  for (const [code, hid, label] of SPECIAL) { codeToHid[code] = hid; hidToLabel[hid] = label; }
+  return { EVENT_CODE_TO_HID: codeToHid, HID_TO_LABEL: hidToLabel };
+})();
+
+function keycodeToLabel(hid) {
+  return HID_TO_LABEL[hid] || ('0x' + (hid >>> 0).toString(16).toUpperCase());
+}
+
+// Get the (or lazily create) KeyboardModeConfig for this profile.
+// `profile.keyboardModeConfig` is a 1-based index into `config.keyboardModes[]`.
+function ensureKeyboardConfig(profile) {
+  if (!config) return null;
+  if (!Array.isArray(config.keyboardModes)) config.keyboardModes = [];
+
+  const idx = (profile.keyboardModeConfig || 0) - 1;
+  if (idx >= 0 && idx < config.keyboardModes.length && config.keyboardModes[idx]) {
+    return config.keyboardModes[idx];
+  }
+  const fresh = { buttonsToKeycodes: [] };
+  if (profile.keyboardModeConfig && profile.keyboardModeConfig > 0) {
+    while (config.keyboardModes.length < profile.keyboardModeConfig - 1) {
+      config.keyboardModes.push({ buttonsToKeycodes: [] });
+    }
+    if (config.keyboardModes.length === profile.keyboardModeConfig - 1) {
+      config.keyboardModes.push(fresh);
+    } else {
+      config.keyboardModes[profile.keyboardModeConfig - 1] = fresh;
+    }
+    return fresh;
+  }
+  config.keyboardModes.push(fresh);
+  profile.keyboardModeConfig = config.keyboardModes.length;
+  return fresh;
+}
+
+function getKeyboardConfig(profile) {
+  if (!profile || !config?.keyboardModes) return null;
+  const idx = (profile.keyboardModeConfig || 0) - 1;
+  if (idx < 0) return null;
+  return config.keyboardModes[idx] || null;
+}
+
+function getButtonKeycode(profile, btnId) {
+  const kb = getKeyboardConfig(profile);
+  if (!kb?.buttonsToKeycodes) return null;
+  const entry = kb.buttonsToKeycodes.find(b => b.button === btnId);
+  return entry ? Number(entry.keycode) : null;
+}
+
+function setButtonKeycode(profile, btnId, keycode) {
+  const kb = ensureKeyboardConfig(profile);
+  if (!kb.buttonsToKeycodes) kb.buttonsToKeycodes = [];
+  const i = kb.buttonsToKeycodes.findIndex(b => b.button === btnId);
+  if (keycode == null) {
+    if (i >= 0) kb.buttonsToKeycodes.splice(i, 1);
+  } else if (i >= 0) {
+    kb.buttonsToKeycodes[i].keycode = keycode;
+  } else {
+    kb.buttonsToKeycodes.push({ button: btnId, keycode });
+  }
+}
+
+function isKeyboardProfile(profile) {
+  return profile?.modeId === 'MODE_KEYBOARD';
+}
+
 // MB1 is the hardware "open device menu" button — never remappable, but it has
 // an addressable LED so its color can still be customised.
 const NON_REMAPPABLE_BUTTONS = new Set(['BTN_MB1']);
@@ -866,9 +980,21 @@ function buildControllerSVG() {
   const rmap = remapMap(profile);
   const platformStyle = PLATFORM_STYLES[selectedPlatform] || XBOX_STYLE;
 
+  const keyboardMode = isKeyboardProfile(profile);
+
   for (const btn of BUTTON_LAYOUT) {
-    const outputId = resolveButtonOutput(btn.id, profile, rmap);
-    const style = outputId ? platformStyle[outputId] : null;
+    let style = null;
+    if (keyboardMode) {
+      // In keyboard mode the button shows whichever HID key it sends.
+      // buttonRemapping is bypassed by the firmware here (per CustomKeyboardMode.cpp).
+      const keycode = getButtonKeycode(profile, btn.id);
+      if (keycode != null) {
+        style = { label: keycodeToLabel(keycode), bg: DARK_BG, fg: LIGHT_TEXT, kind: 'key' };
+      }
+    } else {
+      const outputId = resolveButtonOutput(btn.id, profile, rmap);
+      style = outputId ? platformStyle[outputId] : null;
+    }
     const isMapped = !!style;
     // Ring visibility:
     //   - MB1: always shown (it has an LED, can't be remapped → ring is the only signal)
@@ -1111,6 +1237,12 @@ function renderSettingsPanel() {
   $('settings-profile-name').textContent = profile.name || 'Profile Settings';
   $('set-name').value = profile.name || '';
 
+  // Keyboard mode hides backends (DInput is forced) and Button Remapping
+  // (the firmware bypasses buttonRemapping in keyboard mode).
+  const keyboardMode = isKeyboardProfile(profile);
+  $('backends-group').style.display = keyboardMode ? 'none' : '';
+  $('remap-group').style.display    = keyboardMode ? 'none' : '';
+
   // Mode select
   const modeSelect = $('set-mode-id');
   modeSelect.innerHTML = '';
@@ -1314,34 +1446,47 @@ function openOutputPopup(btnId, _evt) {
 
   const remappable = canRemap(btnId);
   const hasLed = hasLED(btnId);
+  const keyboardMode = isKeyboardProfile(profile);
 
-  // Toggle popup sections based on what this button supports
-  $('output-popup-grid').style.display     = remappable ? '' : 'none';
+  // Toggle popup sections.
+  //  - keyboard mode: hide output grid, show key-capture box, hide un-map for non-remappable buttons
+  //  - controller mode: hide key-capture box, show output grid for remappable buttons
+  $('output-popup-grid').style.display     = (!keyboardMode && remappable) ? '' : 'none';
+  $('output-popup-keyboard').style.display = (keyboardMode && remappable)  ? '' : 'none';
   $('output-popup-unmap').style.display    = remappable ? '' : 'none';
   $('output-popup-color').style.display    = hasLed     ? '' : 'none';
 
-  const grid = $('output-popup-grid');
-  grid.innerHTML = '';
+  if (!keyboardMode) {
+    const grid = $('output-popup-grid');
+    grid.innerHTML = '';
+    if (remappable) {
+      const platformStyle = PLATFORM_STYLES[selectedPlatform] || XBOX_STYLE;
+      const isMenuBtn = btnId.startsWith('BTN_MB');
+      const available = availableOutputs(profile.modeId);
 
-  if (remappable) {
-    const platformStyle = PLATFORM_STYLES[selectedPlatform] || XBOX_STYLE;
-    const isMenuBtn = btnId.startsWith('BTN_MB');
-    // For menu buttons, allow setting any icon via menuButtonIcon.
-    // For main buttons, only show outputs that some physical button produces in this mode.
-    const available = availableOutputs(profile.modeId);
-
-    for (const outId of POPUP_OUTPUT_ORDER) {
-      if (!isMenuBtn && !available.has(outId)) continue;
-      const style = platformStyle[outId];
-      if (!style) continue;
-      grid.appendChild(renderOutputGlyph(outId, style));
+      for (const outId of POPUP_OUTPUT_ORDER) {
+        if (!isMenuBtn && !available.has(outId)) continue;
+        const style = platformStyle[outId];
+        if (!style) continue;
+        grid.appendChild(renderOutputGlyph(outId, style));
+      }
     }
+  } else {
+    // Show the current keycode (or prompt) on the capture button
+    syncPopupKeyboardInput(btnId);
   }
 
   if (hasLed) syncPopupColorControls(btnId);
 
   positionOutputPopup(btnId);
   $('output-popup').classList.remove('hidden');
+}
+
+function syncPopupKeyboardInput(btnId) {
+  const btn = $('popup-keyboard-input');
+  btn.classList.remove('capturing');
+  const code = getButtonKeycode(currentProfile(), btnId);
+  btn.textContent = (code != null) ? keycodeToLabel(code) : 'Click then press a key';
 }
 
 function syncPopupColorControls(btnId) {
@@ -1497,7 +1642,10 @@ function unmapSelected() {
   const profile = currentProfile();
   if (!profile || !selectedBtnId) { closeOutputPopup(); return; }
 
-  if (selectedBtnId.startsWith('BTN_MB')) {
+  if (isKeyboardProfile(profile)) {
+    // Keyboard mode: clear the keycode for this physical button.
+    setButtonKeycode(profile, selectedBtnId, null);
+  } else if (selectedBtnId.startsWith('BTN_MB')) {
     const mbIdx = parseInt(selectedBtnId.slice(6), 10) - 1;
     if (!profile.menuButtonIcon) profile.menuButtonIcon = emptyMenuIconArray();
     profile.menuButtonIcon[mbIdx] = 'OUT_UNSPECIFIED';
@@ -1543,8 +1691,20 @@ function wireSettingsHandlers() {
 
   $('set-mode-id').addEventListener('change', () => {
     const p = currentProfile();
-    if (p) p.modeId = $('set-mode-id').value;
+    if (!p) return;
+    const oldMode = p.modeId;
+    const newMode = $('set-mode-id').value;
+    p.modeId = newMode;
+    // Keyboard mode is DInput-only by firmware design — force the backend
+    // list when switching in or restore USB defaults when switching out.
+    if (newMode === 'MODE_KEYBOARD' && oldMode !== 'MODE_KEYBOARD') {
+      p.applicableBackends = ['COMMS_BACKEND_DINPUT'];
+    } else if (oldMode === 'MODE_KEYBOARD' && newMode !== 'MODE_KEYBOARD') {
+      p.applicableBackends = [...USB_BACKENDS];
+    }
     renderProfileList();
+    renderSettingsPanel();   // toggle backends/remap visibility
+    buildControllerSVG();    // re-render with new mode's labels
   });
 
   // Collapsible Button Remapping section
@@ -1588,10 +1748,13 @@ function wireSettingsHandlers() {
     if (colorInt == null) { $('set-rgb-color-hex').classList.add('invalid'); return; }
     const rgb = ensureRgbConfig(p);
     rgb.defaultColor = colorInt;
+    const keyboardMode = isKeyboardProfile(p);
     const rmap = remapMap(p);
     for (const btn of BUTTON_LAYOUT) {
-      const out = resolveButtonOutput(btn.id, p, rmap);
-      if (out) setButtonColor(p, btn.id, colorInt);
+      const active = keyboardMode
+        ? (getButtonKeycode(p, btn.id) != null)
+        : (resolveButtonOutput(btn.id, p, rmap) != null);
+      if (active) setButtonColor(p, btn.id, colorInt);
     }
     buildControllerSVG();
   });
@@ -1673,6 +1836,48 @@ function wireToolbarHandlers() {
     setButtonColor(profile, selectedBtnId, colorInt);
     $('popup-color-picker').value = colorIntToHex(colorInt);
     applyLiveButtonColor(selectedBtnId, colorInt);
+  });
+
+  // Keyboard mode: enter "capturing" state on click, listen for next keydown.
+  let keyboardCapturing = false;
+  $('popup-keyboard-input').addEventListener('click', () => {
+    keyboardCapturing = true;
+    const el = $('popup-keyboard-input');
+    el.classList.add('capturing');
+    el.textContent = 'Press any key…';
+    el.focus();
+  });
+
+  $('popup-keyboard-input').addEventListener('blur', () => {
+    if (!keyboardCapturing) return;
+    keyboardCapturing = false;
+    $('popup-keyboard-input').classList.remove('capturing');
+    if (selectedBtnId) syncPopupKeyboardInput(selectedBtnId);
+  });
+
+  // Capture the next keydown while focused
+  $('popup-keyboard-input').addEventListener('keydown', (e) => {
+    if (!keyboardCapturing) return;
+    e.preventDefault();
+    e.stopPropagation();
+    // Escape cancels capture without binding (so the user can always escape the capture state)
+    if (e.code === 'Escape') {
+      keyboardCapturing = false;
+      $('popup-keyboard-input').classList.remove('capturing');
+      if (selectedBtnId) syncPopupKeyboardInput(selectedBtnId);
+      $('popup-keyboard-input').blur();
+      return;
+    }
+    const hid = EVENT_CODE_TO_HID[e.code];
+    if (hid == null) return;  // unsupported key; stay capturing
+    const profile = currentProfile();
+    if (!profile || !selectedBtnId) return;
+    setButtonKeycode(profile, selectedBtnId, hid);
+    keyboardCapturing = false;
+    const el = $('popup-keyboard-input');
+    el.classList.remove('capturing');
+    el.textContent = keycodeToLabel(hid);
+    buildControllerSVG();
   });
 
   $('popup-remove-lighting').addEventListener('click', () => {

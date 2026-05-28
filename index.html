@@ -89,7 +89,7 @@
           <label class="setting-label">Name</label>
           <input type="text" id="set-name" class="setting-input" placeholder="Profile name">
         </div>
-        <div class="setting-group">
+        <div class="setting-group" id="backends-group">
           <label class="setting-label">Backends</label>
           <div id="set-backends" class="checkbox-group"></div>
         </div>
@@ -131,6 +131,10 @@
       <button id="output-popup-close" class="output-popup-close" aria-label="Close">✕</button>
     </div>
     <div id="output-popup-grid" class="output-popup-grid"></div>
+    <div id="output-popup-keyboard" class="output-popup-keyboard" hidden>
+      <button type="button" id="popup-keyboard-input" class="popup-keyboard-input">Click then press a key</button>
+      <div class="output-popup-hint">Captures one HID key per button. Bypasses Button Remapping in keyboard mode.</div>
+    </div>
     <div id="output-popup-color" class="output-popup-color">
       <input type="color" id="popup-color-picker" class="popup-color-picker" value="#22d3ee" aria-label="LED color picker">
       <input type="text" id="popup-color-hex" class="popup-color-hex" value="#22d3ee" maxlength="7" spellcheck="false" aria-label="LED hex color">

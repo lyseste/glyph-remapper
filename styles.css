@@ -863,6 +863,55 @@ html, body {
   pointer-events: none;
 }
 
+/* Popup: keyboard "press a key" capture box */
+.output-popup-keyboard {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.popup-keyboard-input {
+  width: 100%;
+  padding: 14px;
+  background: #2F2F2F;
+  border: 2px dashed var(--border-light);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: 'Inconsolata', 'Consolas', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+}
+
+.popup-keyboard-input:hover {
+  border-color: var(--accent-dim);
+}
+
+.popup-keyboard-input.capturing {
+  border-color: var(--accent);
+  border-style: solid;
+  background: var(--bg-hover);
+  color: var(--accent);
+  animation: kb-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes kb-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  50%      { box-shadow: 0 0 0 4px var(--accent-soft); }
+}
+
+.popup-keyboard-input:focus { outline: none; }
+
+.output-popup-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.4;
+  font-style: italic;
+}
+
 /* Popup LED color row */
 .output-popup-color {
   display: flex;
