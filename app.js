@@ -43,60 +43,65 @@ message DeviceInfo { string firmware_name=1; string firmware_version=2; string d
 `;
 
 // ---------------------------------------------------------------------------
-// Constants: Button layout (from button_positions.hpp, viewBox 0 0 140 72)
+// Constants: Button layout (positions from the reference layout SVG,
+// viewBox 0 0 912 491). Buttons are r=29.3 except LT6 (large, r=34.5) and
+// the menu cluster MB1-7 (r=8.5). Menu buttons sit in the top-left corner.
 // ---------------------------------------------------------------------------
 const BUTTON_LAYOUT = [
-  // Left front cluster
-  { id: 'BTN_LF4', x: 6,    y: 29,   r: 4,   label: 'LF4' },
-  { id: 'BTN_LF3', x: 15,   y: 23,   r: 4,   label: 'LF3' },
-  { id: 'BTN_LF2', x: 25,   y: 22,   r: 4,   label: 'LF2' },
-  { id: 'BTN_LF1', x: 35,   y: 27,   r: 4,   label: 'LF1' },
-  { id: 'BTN_LF5', x: 24,   y: 32,   r: 4,   label: 'LF5' },
-  // Left upper row
-  { id: 'BTN_LF8', x: 35,   y: 17,   r: 4,   label: 'LF8' },
-  { id: 'BTN_LF7', x: 46,   y: 19,   r: 4,   label: 'LF7' },
-  { id: 'BTN_LF6', x: 55,   y: 25,   r: 4,   label: 'LF6' },
-  // Left thumb cluster
-  { id: 'BTN_LT5', x: 30,   y: 46,   r: 4,   label: 'LT5' },
-  { id: 'BTN_LT4', x: 38,   y: 40,   r: 4,   label: 'LT4' },
-  { id: 'BTN_LT3', x: 46,   y: 46,   r: 4,   label: 'LT3' },
-  { id: 'BTN_LT1', x: 38,   y: 52,   r: 4,   label: 'LT1' },
-  { id: 'BTN_LT2', x: 46,   y: 58,   r: 4,   label: 'LT2' },
-  { id: 'BTN_LT6', x: 59,   y: 50,   r: 5.5, label: 'LT6', large: true },
-  // RF center cluster
-  { id: 'BTN_RF16',x: 72,   y: 35,   r: 4,   label: 'RF16' },
-  { id: 'BTN_RF13',x: 64,   y: 20,   r: 4,   label: 'RF13' },
-  { id: 'BTN_RF14',x: 74,   y: 15,   r: 4,   label: 'RF14' },
-  { id: 'BTN_RF15',x: 84,   y: 15,   r: 4,   label: 'RF15' },
-  { id: 'BTN_RF10',x: 64,   y: 30,   r: 4,   label: 'RF10' },
-  { id: 'BTN_RF11',x: 74,   y: 25,   r: 4,   label: 'RF11' },
-  { id: 'BTN_RF12',x: 84,   y: 25,   r: 4,   label: 'RF12' },
-  // RF face buttons top row
-  { id: 'BTN_RF5', x: 93,   y: 17,   r: 4,   label: 'RF5' },
-  { id: 'BTN_RF6', x: 102,  y: 13,   r: 4,   label: 'RF6' },
-  { id: 'BTN_RF7', x: 112,  y: 14,   r: 4,   label: 'RF7' },
-  { id: 'BTN_RF8', x: 122,  y: 19,   r: 4,   label: 'RF8' },
-  // RF face buttons bottom row
-  { id: 'BTN_RF1', x: 93,   y: 27,   r: 4,   label: 'RF1' },
-  { id: 'BTN_RF2', x: 102,  y: 23,   r: 4,   label: 'RF2' },
-  { id: 'BTN_RF3', x: 112,  y: 24,   r: 4,   label: 'RF3' },
-  { id: 'BTN_RF4', x: 122,  y: 29,   r: 4,   label: 'RF4' },
-  // RF9
-  { id: 'BTN_RF9', x: 101,  y: 34,   r: 4,   label: 'RF9' },
+  // Left finger cluster
+  { id: 'BTN_LF4', x:  55.35, y: 171.26, r: 29.30, label: 'LF4' },
+  { id: 'BTN_LF3', x: 120.47, y: 130.89, r: 29.30, label: 'LF3' },
+  { id: 'BTN_LF2', x: 192.10, y: 124.38, r: 29.30, label: 'LF2' },
+  { id: 'BTN_LF1', x: 257.22, y: 154.33, r: 29.30, label: 'LF1' },
+  { id: 'BTN_LF5', x: 181.68, y: 186.89, r: 29.30, label: 'LF5' },
+  { id: 'BTN_LF8', x: 253.31, y:  89.21, r: 29.30, label: 'LF8' },
+  { id: 'BTN_LF7', x: 324.95, y: 100.94, r: 29.30, label: 'LF7' },
+  { id: 'BTN_LF6', x: 383.55, y: 141.31, r: 29.30, label: 'LF6' },
+  // Left thumb cluster (+ LT6 large)
+  { id: 'BTN_LT4', x: 281.97, y: 258.52, r: 29.30, label: 'LT4' },
+  { id: 'BTN_LT5', x: 223.36, y: 287.17, r: 29.30, label: 'LT5' },
+  { id: 'BTN_LT3', x: 334.07, y: 296.29, r: 29.30, label: 'LT3' },
+  { id: 'BTN_LT1', x: 275.46, y: 323.64, r: 29.30, label: 'LT1' },
+  { id: 'BTN_LT2', x: 328.86, y: 360.11, r: 29.30, label: 'LT2' },
+  { id: 'BTN_LT6', x: 413.52, y: 309.30, r: 34.51, label: 'LT6', large: true },
+  // RF central cluster — top row (RF13, RF14, RF15)
+  { id: 'BTN_RF13', x: 444.77, y: 106.15, r: 29.30, label: 'RF13' },
+  { id: 'BTN_RF14', x: 508.58, y:  77.49, r: 29.30, label: 'RF14' },
+  { id: 'BTN_RF15', x: 581.52, y:  77.49, r: 29.30, label: 'RF15' },
+  // RF central cluster — middle row (RF10, RF11, RF12 below RF13/14/15)
+  { id: 'BTN_RF10', x: 444.77, y: 175.17, r: 29.30, label: 'RF10' },
+  { id: 'BTN_RF11', x: 509.89, y: 145.22, r: 29.30, label: 'RF11' },
+  { id: 'BTN_RF12', x: 581.52, y: 145.22, r: 29.30, label: 'RF12' },
+  // RF16 (bottom of central cluster, below RF11)
+  { id: 'BTN_RF16', x: 503.37, y: 212.94, r: 29.30, label: 'RF16' },
+  // RF face buttons — upper arc (RF5-8)
+  { id: 'BTN_RF5',  x: 653.15, y:  85.31, r: 29.30, label: 'RF5' },
+  { id: 'BTN_RF6',  x: 719.57, y:  55.35, r: 29.30, label: 'RF6' },
+  { id: 'BTN_RF7',  x: 791.20, y:  63.17, r: 29.30, label: 'RF7' },
+  { id: 'BTN_RF8',  x: 856.32, y: 103.54, r: 29.30, label: 'RF8' },
+  // RF face buttons — lower arc (RF1-4 below RF5-8)
+  { id: 'BTN_RF1',  x: 653.15, y: 154.33, r: 29.30, label: 'RF1' },
+  { id: 'BTN_RF2',  x: 719.57, y: 124.38, r: 29.30, label: 'RF2' },
+  { id: 'BTN_RF3',  x: 791.20, y: 132.19, r: 29.30, label: 'RF3' },
+  { id: 'BTN_RF4',  x: 856.32, y: 172.57, r: 29.30, label: 'RF4' },
+  // RF9 (between RF4 and the right-thumb cluster)
+  { id: 'BTN_RF9',  x: 711.76, y: 193.41, r: 29.30, label: 'RF9' },
   // Right thumb cluster
-  { id: 'BTN_RT4', x: 90,   y: 40,   r: 4,   label: 'RT4' },
-  { id: 'BTN_RT3', x: 82,   y: 46,   r: 4,   label: 'RT3' },
-  { id: 'BTN_RT5', x: 98,   y: 46,   r: 4,   label: 'RT5' },
-  { id: 'BTN_RT1', x: 90,   y: 52,   r: 4,   label: 'RT1' },
-  { id: 'BTN_RT2', x: 82,   y: 58,   r: 4,   label: 'RT2' },
-  // Menu buttons (top bar)
-  { id: 'BTN_MB1', x: 35,   y: 5.5,  r: 2.5, label: 'MB1', menu: true },
-  { id: 'BTN_MB2', x: 43,   y: 5.5,  r: 2.5, label: 'MB2', menu: true },
-  { id: 'BTN_MB3', x: 51,   y: 5.5,  r: 2.5, label: 'MB3', menu: true },
-  { id: 'BTN_MB4', x: 59,   y: 5.5,  r: 2.5, label: 'MB4', menu: true },
-  { id: 'BTN_MB5', x: 75,   y: 5.5,  r: 2.5, label: 'MB5', menu: true },
-  { id: 'BTN_MB6', x: 83,   y: 5.5,  r: 2.5, label: 'MB6', menu: true },
-  { id: 'BTN_MB7', x: 91,   y: 5.5,  r: 2.5, label: 'MB7', menu: true },
+  { id: 'BTN_RT4',  x: 629.70, y: 258.52, r: 29.30, label: 'RT4' },
+  { id: 'BTN_RT3',  x: 577.61, y: 296.29, r: 29.30, label: 'RT3' },
+  { id: 'BTN_RT5',  x: 688.31, y: 287.18, r: 29.30, label: 'RT5' },
+  { id: 'BTN_RT1',  x: 636.22, y: 323.64, r: 29.30, label: 'RT1' },
+  { id: 'BTN_RT2',  x: 582.82, y: 360.11, r: 29.30, label: 'RT2' },
+  // Menu buttons — top-left corner, in a row. Larger (r=13) than the layout SVG
+  // mockup so the assigned icon is readable; centres spaced 29 units apart so
+  // the row only grows slightly wider than before.
+  { id: 'BTN_MB1', x:  60, y: 25, r: 13, label: 'MB1', menu: true },
+  { id: 'BTN_MB2', x:  89, y: 25, r: 13, label: 'MB2', menu: true },
+  { id: 'BTN_MB3', x: 118, y: 25, r: 13, label: 'MB3', menu: true },
+  { id: 'BTN_MB4', x: 147, y: 25, r: 13, label: 'MB4', menu: true },
+  { id: 'BTN_MB5', x: 176, y: 25, r: 13, label: 'MB5', menu: true },
+  { id: 'BTN_MB6', x: 205, y: 25, r: 13, label: 'MB6', menu: true },
+  { id: 'BTN_MB7', x: 234, y: 25, r: 13, label: 'MB7', menu: true },
 ];
 
 const BUTTON_BY_ID = Object.fromEntries(BUTTON_LAYOUT.map(b => [b.id, b]));
@@ -113,13 +118,21 @@ const ALL_BUTTONS = [
 const GAME_MODE_IDS = ['MODE_MELEE','MODE_PROJECT_M','MODE_ULTIMATE','MODE_FGC',
   'MODE_RIVALS_OF_AETHER','MODE_KEYBOARD','MODE_CUSTOM','MODE_64','MODE_RIVALS2'];
 
-const BACKEND_IDS = ['COMMS_BACKEND_DINPUT','COMMS_BACKEND_XINPUT','COMMS_BACKEND_NINTENDO_SWITCH',
-  'COMMS_BACKEND_GAMECUBE','COMMS_BACKEND_N64','COMMS_BACKEND_NES','COMMS_BACKEND_SNES',
-  'COMMS_BACKEND_PASSTHROUGH_PS4','COMMS_BACKEND_PASSTHROUGH_PS5'];
+// USB is a UI-only umbrella that maps to the three desktop/Switch backends.
+// PASSTHROUGH_PS4 / PS5 are intentionally hidden from the UI for now.
+const USB_BACKENDS = ['COMMS_BACKEND_DINPUT','COMMS_BACKEND_XINPUT','COMMS_BACKEND_NINTENDO_SWITCH'];
+
+// Backend choices shown in the UI, in display order.
+// Each entry is either a backend id (string) or a virtual group { id, label, members }.
+const BACKEND_CHOICES = [
+  { id: 'USB', label: 'USB', members: USB_BACKENDS },
+  'COMMS_BACKEND_GAMECUBE',
+  'COMMS_BACKEND_N64',
+  'COMMS_BACKEND_NES',
+  'COMMS_BACKEND_SNES',
+];
 
 const SOCD_TYPES = ['SOCD_NEUTRAL','SOCD_2IP','SOCD_2IP_NO_REAC','SOCD_DIR1_PRIORITY','SOCD_DIR2_PRIORITY'];
-
-const LAYOUT_PLATES = ['LAYOUT_PLATE_EVERYTHING','LAYOUT_PLATE_FGC','LAYOUT_PLATE_SPLIT_FGC','LAYOUT_PLATE_PLATFORM_FIGHTER'];
 
 // Labels for menu button output options
 const OUTPUT_OPTION_LABELS = {
@@ -144,16 +157,16 @@ const OUTPUT_OPTION_LABELS = {
 const FGC_MAP = {
   // D-pad (firmware: LF1/2/3=dpad right/down/left, LT1=dpad up)
   BTN_LF1: 'dright', BTN_LF2: 'ddown', BTN_LF3: 'dleft', BTN_LT1: 'dup',
-  // Left stick click (firmware: LT2)
-  BTN_LT2: 'ls',
+  // Stick clicks (firmware: LT2=L3, RT1=R3)
+  BTN_LT2: 'ls', BTN_RT1: 'rs',
   // Face buttons / triggers / bumpers (XInput layout)
   BTN_RF1: 'a',  BTN_RF2: 'b',  BTN_RF3: 'rt', BTN_RF4: 'lt',
   BTN_RF5: 'x',  BTN_RF6: 'y',  BTN_RF7: 'rb', BTN_RF8: 'lb',
-  // NOTE: Firmware FGC mode also maps RT1=rs and RT3/5/2/4 = right-stick,
-  // and LF8/6/7/LT6 = left-stick directions. These are intentionally omitted
-  // from the configurator display to match the original layout where the
-  // FGC profile only shows the digital fight-stick face buttons + D-pad.
-  // Menu buttons (MB1-MB7) are handled via profile.menuButtonIcon — not in this map.
+  // Left-stick directions (firmware: LF8/6/7/LT6)
+  BTN_LF8: 'lsl', BTN_LF6: 'lsr', BTN_LF7: 'lsd', BTN_LT6: 'lsu',
+  // Right-stick / C-stick directions (firmware: RT3/5/2/4)
+  BTN_RT3: 'csl', BTN_RT5: 'csr', BTN_RT2: 'csd', BTN_RT4: 'csu',
+  // Menu buttons (MB1-MB7) handled via profile.menuButtonIcon — not in this map.
 };
 
 const PLATFORM_FIGHTER_MAP = {
@@ -174,10 +187,26 @@ const PLATFORM_FIGHTER_MAP = {
 
 const MELEE_MAP = {
   ...PLATFORM_FIGHTER_MAP,
-  // Melee20Button uses LT6 for direct DPad up, and LF7 for down
+  // Direct DPad in Melee20Button uses LT6/LF7/LF8/LF6 (LF8/LF6 same as PFM).
   BTN_LT6: 'dup',
   BTN_LF7: 'ddown',
-  // Single Start (MB1 in Melee18Button is unused here; MB7 already covers start)
+  // RF7 = light shield, RF8 = mid shield (triggerRAnalog at 49 / 94).
+  // These override PFM's RF7=ddown / RF8=dup since Melee uses LT6/LF7 for those.
+  BTN_RF7: 'rt_light',
+  BTN_RF8: 'rt_mid',
+};
+
+// Smash 64 mode (src/modes/64.cpp) - c-pad uses RF7/RF8/RF2/RF6 (NOT RT cluster)
+const SMASH64_MAP = {
+  BTN_RT1: 'a', BTN_RF1: 'b',
+  BTN_RF5: 'rt', BTN_RF3: 'rb',  // R trigger, Z (mapped to RB on XInput)
+  BTN_LF4: 'lt',                  // L trigger
+  // Left stick
+  BTN_LF3: 'lsl', BTN_LF1: 'lsr', BTN_LF2: 'lsd', BTN_RF4: 'lsu',
+  // Right stick / C-pad
+  BTN_RF7: 'csl', BTN_RF8: 'csr', BTN_RF2: 'csd', BTN_RF6: 'csu',
+  // D-Pad
+  BTN_LT6: 'dup', BTN_LF7: 'ddown', BTN_LF8: 'dleft', BTN_LF6: 'dright',
 };
 
 const MODE_OUTPUT_MAP = {
@@ -187,7 +216,8 @@ const MODE_OUTPUT_MAP = {
   MODE_RIVALS_OF_AETHER: PLATFORM_FIGHTER_MAP,
   MODE_RIVALS2: PLATFORM_FIGHTER_MAP,
   MODE_MELEE: MELEE_MAP,
-  // 64, custom, keyboard – left undefined for now; falls back to blank
+  MODE_64: SMASH64_MAP,
+  // keyboard / custom – left undefined; falls back to blank
 };
 
 // Map proto OutputOption enum values (used in profile.menuButtonIcon) to our
@@ -213,26 +243,27 @@ const OUTPUT_OPTION_TO_OUTPUT_ID = {
 
 // ---------------------------------------------------------------------------
 // Platform display styles
-// Each output id resolves to a visual: { label, bg, fg, kind }
+// Each output id resolves to a visual: { label?, glyph?, bg, fg, kind }
 // kind: 'face' | 'shoulder' | 'system' | 'dpad' | 'stick' | 'cstick' | 'mod'
+// glyph: 'cross' | 'circle' | 'square' | 'triangle' (PS face-button shapes)
 // ---------------------------------------------------------------------------
-const NEUTRAL_LIGHT = '#d8dee5';
-const NEUTRAL_DARK_TEXT = '#1a2a40';
-const SYSTEM_BG = '#5a6878';
-const MOD_BG = '#7a8898';
+const DARK_BG = '#404040';        // controller-button base when mapped
+const POPUP_NEUTRAL_BG = '#2F2F2F'; // popup glyph base (lighter than popup card)
+const LIGHT_TEXT = '#f5f5f5';
 
 function mkFace(label, bg, fg = '#fff') { return { label, bg, fg, kind: 'face' }; }
-function mkShoulder(label) { return { label, bg: NEUTRAL_LIGHT, fg: NEUTRAL_DARK_TEXT, kind: 'shoulder' }; }
-function mkSystem(label) { return { label, bg: SYSTEM_BG, fg: '#fff', kind: 'system' }; }
-function mkDpad(dir) { return { label: dir, bg: SYSTEM_BG, fg: '#fff', kind: 'dpad' }; }
-function mkStick(kind, dir) { return { label: dir, bg: NEUTRAL_LIGHT, fg: NEUTRAL_DARK_TEXT, kind }; }
-function mkMod(label) { return { label, bg: MOD_BG, fg: '#fff', kind: 'mod' }; }
+function mkFaceGlyph(glyph, color) { return { glyph, bg: DARK_BG, fg: color, kind: 'face' }; }
+function mkShoulder(label) { return { label, bg: DARK_BG, fg: LIGHT_TEXT, kind: 'shoulder' }; }
+function mkSystem(label) { return { label, bg: DARK_BG, fg: LIGHT_TEXT, kind: 'system' }; }
+function mkDpad(dir) { return { label: dir, bg: DARK_BG, fg: LIGHT_TEXT, kind: 'dpad' }; }
+function mkStick(kind, dir) { return { label: dir, bg: DARK_BG, fg: LIGHT_TEXT, kind }; }
+function mkMod(label) { return { label, bg: DARK_BG, fg: LIGHT_TEXT, kind: 'mod' }; }
 
 const XBOX_STYLE = {
   a: mkFace('A', '#2ea043'),
   b: mkFace('B', '#e0464a'),
   x: mkFace('X', '#3a86c9'),
-  y: mkFace('Y', '#e8c038', NEUTRAL_DARK_TEXT),
+  y: mkFace('Y', '#e8c038', '#1a2a40'),
   lb: mkShoulder('LB'), rb: mkShoulder('RB'),
   lt: mkShoulder('LT'), rt: mkShoulder('RT'),
   ls: mkShoulder('LS'), rs: mkShoulder('RS'),
@@ -244,15 +275,18 @@ const XBOX_STYLE = {
   csl: mkStick('cstick', '←'), csr: mkStick('cstick', '→'),
   csu: mkStick('cstick', '↑'), csd: mkStick('cstick', '↓'),
   mx: mkMod('MX'), my: mkMod('MY'),
+  // Melee-specific partial RT presses
+  rt_light: mkShoulder('Lt'), rt_mid: mkShoulder('Md'),
 };
 
-// PlayStation: face buttons get position-mapped to PS symbols & colors.
+// PlayStation: face buttons get position-mapped to PS symbols.
 // Xbox A (bottom) → Cross, B (right) → Circle, X (left) → Square, Y (top) → Triangle.
+// Each glyph renders as an outlined SVG shape in its canonical color on a dark bg.
 const PS_STYLE = {
-  a: mkFace('✕', '#5b7ec5'),   // Cross (blue)
-  b: mkFace('●', '#cc5562'),   // Circle (red)
-  x: mkFace('■', '#e266a8'),   // Square (pink)
-  y: mkFace('▲', '#5fc295'),   // Triangle (green)
+  a: mkFaceGlyph('cross',    '#7DB3E9'),   // Cross (blue)
+  b: mkFaceGlyph('circle',   '#FF6666'),   // Circle (red)
+  x: mkFaceGlyph('square',   '#FF69F8'),   // Square (pink)
+  y: mkFaceGlyph('triangle', '#3EE3A1'),   // Triangle (green)
   lb: mkShoulder('L1'), rb: mkShoulder('R1'),
   lt: mkShoulder('L2'), rt: mkShoulder('R2'),
   ls: mkShoulder('L3'), rs: mkShoulder('R3'),
@@ -264,15 +298,16 @@ const PS_STYLE = {
   csl: mkStick('cstick', '←'), csr: mkStick('cstick', '→'),
   csu: mkStick('cstick', '↑'), csd: mkStick('cstick', '↓'),
   mx: mkMod('MX'), my: mkMod('MY'),
+  rt_light: mkShoulder('Lt'), rt_mid: mkShoulder('Md'),
 };
 
 // Switch: A/B and X/Y are swapped relative to Xbox.
 // Xbox A (bottom) → Switch B, B (right) → Switch A, X (left) → Switch Y, Y (top) → Switch X.
 const SWITCH_STYLE = {
-  a: mkFace('B', '#3a4555'),
-  b: mkFace('A', '#3a4555'),
-  x: mkFace('Y', '#3a4555'),
-  y: mkFace('X', '#3a4555'),
+  a: mkFace('B', DARK_BG, LIGHT_TEXT),
+  b: mkFace('A', DARK_BG, LIGHT_TEXT),
+  x: mkFace('Y', DARK_BG, LIGHT_TEXT),
+  y: mkFace('X', DARK_BG, LIGHT_TEXT),
   lb: mkShoulder('L'),  rb: mkShoulder('R'),
   lt: mkShoulder('ZL'), rt: mkShoulder('ZR'),
   ls: mkShoulder('LS'), rs: mkShoulder('RS'),
@@ -284,6 +319,7 @@ const SWITCH_STYLE = {
   csl: mkStick('cstick', '←'), csr: mkStick('cstick', '→'),
   csu: mkStick('cstick', '↑'), csd: mkStick('cstick', '↓'),
   mx: mkMod('MX'), my: mkMod('MY'),
+  rt_light: mkShoulder('Lt'), rt_mid: mkShoulder('Md'),
 };
 
 const PLATFORM_STYLES = {
@@ -356,8 +392,11 @@ async function ensureProtobuf() {
 }
 
 function configToBinary(cfg) {
+  // Strip color entries for buttons with no physical LED (MB2-MB7) so they
+  // never reach the device.
+  const safeCfg = stripDisabledLeds(cfg);
   const Config = pbRoot.lookupType('Config');
-  const msg = Config.fromObject(cfg);
+  const msg = Config.fromObject(safeCfg);
   const err = Config.verify(msg);
   if (err) throw new Error('Config verify: ' + err);
   return Config.encode(msg).finish();
@@ -431,7 +470,6 @@ async function serialConnect() {
     isConnected = true;
     $('btn-connect').classList.add('connected');
     $('connect-label').textContent = 'Disconnect';
-    $('connect-icon').textContent = '✓';
     $('btn-load').disabled = false;
     $('btn-save').disabled = false;
     setStatus('Connected to Glyph — click Load Config to read profiles', 'connected');
@@ -450,7 +488,6 @@ async function serialDisconnect() {
   } catch (_) {}
   isConnected = false;
   $('connect-label').textContent = 'Connect';
-  $('connect-icon').textContent = '⚡';
   $('btn-load').disabled = true;
   $('btn-save').disabled = true;
   setStatus('Disconnected', 'disconnected');
@@ -557,7 +594,8 @@ function loadDefaultConfig() {
 // ---------------------------------------------------------------------------
 function exportConfig() {
   if (!config) { alert('No config loaded.'); return; }
-  const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+  const safeCfg = stripDisabledLeds(config);
+  const blob = new Blob([JSON.stringify(safeCfg, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'glyph-config.json';
@@ -588,6 +626,137 @@ function currentProfile() {
   return config.gameModeConfigs?.[selectedProfileIdx] ?? null;
 }
 
+// ---------------------------------------------------------------------------
+// RGB / LED helpers
+// ---------------------------------------------------------------------------
+const DEFAULT_LED_COLOR_INT = 0x22D3EE;          // cyan accent
+const DEFAULT_LED_COLOR_HEX = '#22d3ee';
+
+// MB1 is the hardware "open device menu" button — never remappable, but it has
+// an addressable LED so its color can still be customised.
+const NON_REMAPPABLE_BUTTONS = new Set(['BTN_MB1']);
+
+// MB2-MB7 are mapped to gamepad outputs but have NO physical LED on the device,
+// so we never write color entries for them and never expose color UI.
+const NO_LED_BUTTONS = new Set([
+  'BTN_MB2', 'BTN_MB3', 'BTN_MB4', 'BTN_MB5', 'BTN_MB6', 'BTN_MB7',
+]);
+
+function hasLED(btnId) { return !NO_LED_BUTTONS.has(btnId); }
+function canRemap(btnId) { return !NON_REMAPPABLE_BUTTONS.has(btnId); }
+
+const RGB_ANIMATIONS = [
+  { value: 'RGB_ANIM_STATIC',              label: 'Static' },
+  { value: 'RGB_ANIM_RAINBOW_XWAVE_LEFT',  label: 'Rainbow Wave' },
+  { value: 'RGB_ANIM_RAINBOW_SHIFT',       label: 'Rainbow Shift' },
+  { value: 'RGB_ANIM_UNSPECIFIED',         label: 'None' },
+];
+
+function colorIntToHex(c) {
+  return '#' + (Number(c) >>> 0).toString(16).padStart(6, '0').slice(-6);
+}
+
+function parseHexInput(text) {
+  let hex = String(text || '').trim().replace(/^#/, '');
+  if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null;
+  return parseInt(hex, 16);
+}
+
+// Get (or lazily create) the RgbConfig object for this profile.
+// `profile.rgbConfig` is a 1-based index into `config.rgbConfigs[]`.
+function makeBlankRgbConfig() {
+  return {
+    buttonColors: [],
+    defaultColor: DEFAULT_LED_COLOR_INT,
+    animation: 'RGB_ANIM_STATIC',
+    speed: 100,
+  };
+}
+
+function ensureRgbConfig(profile) {
+  if (!config) return null;
+  if (!Array.isArray(config.rgbConfigs)) config.rgbConfigs = [];
+
+  const idx = (profile.rgbConfig || 0) - 1;
+
+  if (idx >= 0 && idx < config.rgbConfigs.length && config.rgbConfigs[idx]) {
+    return config.rgbConfigs[idx];
+  }
+
+  // Pad with valid (blank) RgbConfig objects, NOT nulls — otherwise protobuf
+  // encoding (configToBinary) will reject the array when saving to the device.
+  if (profile.rgbConfig && profile.rgbConfig > 0) {
+    while (config.rgbConfigs.length < profile.rgbConfig - 1) {
+      config.rgbConfigs.push(makeBlankRgbConfig());
+    }
+    const fresh = makeBlankRgbConfig();
+    if (config.rgbConfigs.length === profile.rgbConfig - 1) {
+      config.rgbConfigs.push(fresh);
+    } else {
+      config.rgbConfigs[profile.rgbConfig - 1] = fresh;
+    }
+    return fresh;
+  }
+
+  const fresh = makeBlankRgbConfig();
+  config.rgbConfigs.push(fresh);
+  profile.rgbConfig = config.rgbConfigs.length;
+  return fresh;
+}
+
+// Non-mutating lookup of the profile's RgbConfig.
+function getRgbConfig(profile) {
+  if (!profile || !config?.rgbConfigs) return null;
+  const idx = (profile.rgbConfig || 0) - 1;
+  if (idx < 0) return null;
+  return config.rgbConfigs[idx] || null;
+}
+
+// Get the LED color (as uint32) for a physical button on this profile.
+// Falls back to the profile's default color, then to the global default.
+function getButtonColor(profile, btnId) {
+  const rgb = getRgbConfig(profile);
+  if (!rgb) return DEFAULT_LED_COLOR_INT;
+  const entry = rgb.buttonColors?.find(c => c.button === btnId);
+  if (entry) return Number(entry.color) >>> 0;
+  return (rgb.defaultColor != null) ? (Number(rgb.defaultColor) >>> 0) : DEFAULT_LED_COLOR_INT;
+}
+
+function setButtonColor(profile, btnId, color) {
+  // MB2-MB7 have no physical LED — refuse any color assignment so they never
+  // make it into config.rgbConfigs[].buttonColors.
+  if (!hasLED(btnId)) return;
+  const rgb = ensureRgbConfig(profile);
+  if (!rgb.buttonColors) rgb.buttonColors = [];
+  const idx = rgb.buttonColors.findIndex(c => c.button === btnId);
+  const value = (Number(color) >>> 0);
+  if (idx >= 0) rgb.buttonColors[idx].color = value;
+  else rgb.buttonColors.push({ button: btnId, color: value });
+}
+
+// Strip out color entries for buttons that physically lack an LED. Used as a
+// safety net before encoding to protobuf and before JSON export, in case
+// imported configs (or older state) contain entries for MB2-MB7.
+function stripDisabledLeds(cfg) {
+  if (!cfg?.rgbConfigs?.length) return cfg;
+  const clone = JSON.parse(JSON.stringify(cfg));
+  for (const rgb of clone.rgbConfigs) {
+    if (rgb?.buttonColors?.length) {
+      rgb.buttonColors = rgb.buttonColors.filter(bc => hasLED(bc.button));
+    }
+  }
+  return clone;
+}
+
+// Live-update the ring stroke for a single button without rebuilding the whole SVG.
+// The .btn-ring stroke reads from --led-color via CSS, so we set the custom
+// property on the group element (inline style — overrides CSS rules).
+function applyLiveButtonColor(btnId, colorInt) {
+  const g = svg().querySelector(`[data-btn="${btnId}"]`);
+  if (g) g.style.setProperty('--led-color', colorIntToHex(colorInt));
+}
+
 function remapMap(profile) {
   const map = {};
   if (!profile?.buttonRemapping) return map;
@@ -609,24 +778,15 @@ function resolveLogicalButton(physBtnId, rmap) {
   return target;
 }
 
-// Build a set of buttons that are remap targets but not also sources, i.e.
-// buttons whose firmware default role has been "moved" to another physical
-// position by the user. These should not display their default output.
-function consumedTargets(profile) {
-  const consumed = new Set();
-  if (!profile?.buttonRemapping) return consumed;
-  const sources = new Set(profile.buttonRemapping.map(r => r.physicalButton));
-  for (const r of profile.buttonRemapping) {
-    if (r.activates && r.activates !== 'BTN_UNSPECIFIED' && !sources.has(r.activates)) {
-      consumed.add(r.activates);
-    }
-  }
-  return consumed;
-}
-
 // Resolve the platform-agnostic output id for a physical button in the given profile.
-// Returns null if the button has no output (unmapped, disabled, or consumed).
-function resolveButtonOutput(physBtnId, profile, rmap, consumed) {
+// Returns null if the button has no output (unmapped or explicitly disabled).
+//
+// Notes on the "disabled" mechanism: the official configurator marks unused
+// buttons by adding an entry to buttonRemapping with `physicalButton` set but
+// `activates` missing/BTN_UNSPECIFIED. resolveLogicalButton() handles this by
+// returning null when activates is falsy, so we don't need a separate
+// target-hiding rule — the user/config decides what's disabled per profile.
+function resolveButtonOutput(physBtnId, profile, rmap) {
   if (!profile) return null;
 
   // Menu buttons (MB1-MB7) display whatever menuButtonIcon says.
@@ -636,9 +796,6 @@ function resolveButtonOutput(physBtnId, profile, rmap, consumed) {
     if (!outOpt || outOpt === 'OUT_UNSPECIFIED') return null;
     return OUTPUT_OPTION_TO_OUTPUT_ID[outOpt] || null;
   }
-
-  // Main buttons: hide remap targets (their role moved elsewhere)
-  if (consumed && consumed.has(physBtnId)) return null;
 
   const logical = resolveLogicalButton(physBtnId, rmap);
   if (!logical) return null;
@@ -668,7 +825,7 @@ function addProfile() {
     buttonRemapping: [],
     rgbConfig: 0,
     layoutPlate: 'LAYOUT_PLATE_EVERYTHING',
-    applicableBackends: ['COMMS_BACKEND_XINPUT'],
+    applicableBackends: [...USB_BACKENDS],
     menuButtonIcon: ['OUT_UNSPECIFIED','OUT_UNSPECIFIED','OUT_UNSPECIFIED','OUT_UNSPECIFIED','OUT_HOME','OUT_XB_BACK','OUT_START']
   };
   config.gameModeConfigs.push(newProfile);
@@ -700,25 +857,30 @@ function buildControllerSVG() {
   const s = svg();
   s.innerHTML = '';
 
-  // Controller body
-  const body = svgEl('rect', { x:1, y:1, width:138, height:70, rx:9, ry:9, class:'controller-body' });
+  // Controller body — fills the viewBox (912 x 491, rx=19)
+  const body = svgEl('rect', { x:0, y:0, width:912, height:491, rx:19, ry:19, class:'controller-body' });
   s.appendChild(body);
 
   // Render all buttons
   const profile = currentProfile();
   const rmap = remapMap(profile);
-  const consumed = consumedTargets(profile);
   const platformStyle = PLATFORM_STYLES[selectedPlatform] || XBOX_STYLE;
 
   for (const btn of BUTTON_LAYOUT) {
-    const outputId = resolveButtonOutput(btn.id, profile, rmap, consumed);
+    const outputId = resolveButtonOutput(btn.id, profile, rmap);
     const style = outputId ? platformStyle[outputId] : null;
     const isMapped = !!style;
+    // Ring visibility:
+    //   - MB1: always shown (it has an LED, can't be remapped → ring is the only signal)
+    //   - MB2-MB7: never shown (no physical LED on the device)
+    //   - all other buttons: shown when mapped
+    const showRing = NON_REMAPPABLE_BUTTONS.has(btn.id)
+      || (isMapped && hasLED(btn.id));
 
     const classes = ['btn-group'];
     if (btn.large) classes.push('btn-large');
     if (btn.menu) classes.push('btn-menu');
-    classes.push(isMapped ? 'mapped' : 'unmapped');
+    classes.push(showRing ? 'mapped' : 'unmapped');
     if (btn.id === selectedBtnId) classes.push('selected');
 
     const g = svgEl('g', {
@@ -729,8 +891,11 @@ function buildControllerSVG() {
       'aria-label': btn.id + (style ? ' → ' + style.label : '')
     });
 
-    // Outer teal ring
+    // Outer ring (color comes from the --led-color custom property below)
     g.appendChild(svgEl('circle', { cx: btn.x, cy: btn.y, r: btn.r, class: 'btn-ring' }));
+    if (showRing && hasLED(btn.id)) {
+      g.style.setProperty('--led-color', colorIntToHex(getButtonColor(profile, btn.id)));
+    }
 
     // Base fill (dark background inside ring, or solid dark fill if unmapped)
     g.appendChild(svgEl('circle', { cx: btn.x, cy: btn.y, r: btn.r - 0.4, class: 'btn-fill' }));
@@ -739,30 +904,38 @@ function buildControllerSVG() {
       renderButtonIcon(g, btn, style);
     }
 
-    g.addEventListener('click', () => openButtonModal(btn.id));
-    g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') openButtonModal(btn.id); });
+    g.addEventListener('click', (e) => openOutputPopup(btn.id, e));
+    g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') openOutputPopup(btn.id, e); });
 
     s.appendChild(g);
   }
 }
 
-// Render the platform-styled icon inside a button (colored disk + label).
+// Render the platform-styled icon inside a button (colored disk + label/glyph).
 function renderButtonIcon(g, btn, style) {
-  const innerR = btn.r - 1;
-  // Colored disk
+  const innerR = btn.r - 0.6;
+  // Colored disk that covers the gray base fill
   g.appendChild(svgEl('circle', {
     cx: btn.x, cy: btn.y, r: innerR,
     class: 'btn-icon-disk',
     fill: style.bg
   }));
 
-  // Direction arrows are drawn as SVG arrows for dpad/stick/cstick
+  // Direction arrows for dpad/stick/cstick
   if (style.kind === 'dpad' || style.kind === 'stick' || style.kind === 'cstick') {
     renderDirectionGlyph(g, btn, style);
     return;
   }
 
-  // Otherwise, render the text label centered on the disk
+  // PlayStation face-button shapes (cross / circle / square / triangle)
+  if (style.glyph) {
+    const r = btn.r * 0.45;
+    const sw = btn.r * 0.16;
+    g.appendChild(buildPSFaceGlyphSvg(style.glyph, style.fg, btn.x, btn.y, r, sw));
+    return;
+  }
+
+  // Text label
   const fontSize = labelFontSize(btn, style.label);
   const t = svgEl('text', {
     x: btn.x, y: btn.y,
@@ -772,6 +945,56 @@ function renderButtonIcon(g, btn, style) {
   });
   t.textContent = style.label;
   g.appendChild(t);
+}
+
+// Build a PS face-button glyph as an SVG <g> element with the shape centered at (cx, cy).
+// Returns an element you can append directly into an SVG document.
+// `r` is the half-extent of the shape, `sw` is stroke-width.
+function buildPSFaceGlyphSvg(type, color, cx, cy, r, sw) {
+  const NS = 'http://www.w3.org/2000/svg';
+  const g = document.createElementNS(NS, 'g');
+  g.setAttribute('pointer-events', 'none');
+
+  const common = el => {
+    el.setAttribute('stroke', color);
+    el.setAttribute('stroke-width', sw);
+    el.setAttribute('fill', 'none');
+    el.setAttribute('stroke-linejoin', 'round');
+    el.setAttribute('stroke-linecap', 'round');
+    return el;
+  };
+
+  if (type === 'circle') {
+    const c = document.createElementNS(NS, 'circle');
+    c.setAttribute('cx', cx); c.setAttribute('cy', cy);
+    c.setAttribute('r', r);
+    g.appendChild(common(c));
+  } else if (type === 'square') {
+    const rect = document.createElementNS(NS, 'rect');
+    rect.setAttribute('x', cx - r); rect.setAttribute('y', cy - r);
+    rect.setAttribute('width', r * 2); rect.setAttribute('height', r * 2);
+    g.appendChild(common(rect));
+  } else if (type === 'cross') {
+    const l1 = document.createElementNS(NS, 'line');
+    l1.setAttribute('x1', cx - r); l1.setAttribute('y1', cy - r);
+    l1.setAttribute('x2', cx + r); l1.setAttribute('y2', cy + r);
+    g.appendChild(common(l1));
+    const l2 = document.createElementNS(NS, 'line');
+    l2.setAttribute('x1', cx + r); l2.setAttribute('y1', cy - r);
+    l2.setAttribute('x2', cx - r); l2.setAttribute('y2', cy + r);
+    g.appendChild(common(l2));
+  } else if (type === 'triangle') {
+    // Upright triangle. Apex above center, base below.
+    const apexOff = r * 1.05;
+    const baseY = cy + r * 0.65;
+    const p = document.createElementNS(NS, 'path');
+    p.setAttribute('d',
+      `M${cx} ${cy - apexOff}L${cx + r} ${baseY}L${cx - r} ${baseY}Z`
+    );
+    g.appendChild(common(p));
+  }
+
+  return g;
 }
 
 function labelFontSize(btn, label) {
@@ -902,39 +1125,64 @@ function renderSettingsPanel() {
   // Backends
   const beDiv = $('set-backends');
   beDiv.innerHTML = '';
-  for (const b of BACKEND_IDS) {
-    const checked = profile.applicableBackends?.includes(b);
+  if (!profile.applicableBackends) profile.applicableBackends = [];
+
+  for (const choice of BACKEND_CHOICES) {
+    const isGroup = typeof choice === 'object';
+    const members = isGroup ? choice.members : [choice];
+    const label   = isGroup ? choice.label   : choice.replace('COMMS_BACKEND_', '');
+    // A group is "checked" if all its member backends are present in the profile.
+    // A single backend is checked if it's in the profile.
+    const checked = members.every(m => profile.applicableBackends.includes(m));
+
     const lbl = document.createElement('label');
     lbl.className = 'checkbox-item';
-    lbl.innerHTML = `<input type="checkbox" value="${b}"${checked ? ' checked' : ''}> ${b.replace('COMMS_BACKEND_', '')}`;
-    lbl.querySelector('input').addEventListener('change', () => {
-      if (!profile.applicableBackends) profile.applicableBackends = [];
-      const val = lbl.querySelector('input').value;
-      if (lbl.querySelector('input').checked) {
-        if (!profile.applicableBackends.includes(val)) profile.applicableBackends.push(val);
+    lbl.innerHTML = `<input type="checkbox"${checked ? ' checked' : ''}> ${escHtml(label)}`;
+    lbl.querySelector('input').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        for (const m of members) {
+          if (!profile.applicableBackends.includes(m)) profile.applicableBackends.push(m);
+        }
       } else {
-        profile.applicableBackends = profile.applicableBackends.filter(x => x !== val);
+        profile.applicableBackends = profile.applicableBackends.filter(x => !members.includes(x));
       }
     });
     beDiv.appendChild(lbl);
   }
 
-  // Layout plate
-  const lpSelect = $('set-layout-plate');
-  lpSelect.innerHTML = '';
-  for (const lp of LAYOUT_PLATES) {
-    const opt = document.createElement('option');
-    opt.value = lp;
-    opt.textContent = lp.replace('LAYOUT_PLATE_', '');
-    if (lp === profile.layoutPlate) opt.selected = true;
-    lpSelect.appendChild(opt);
-  }
-
   // SOCD pairs
   renderSocdList(profile);
 
-  // Remap list
+  // Button Lighting (RGB animation + per-profile default color)
+  renderRgbSection(profile);
+
+  // Remap list (lives inside a collapsible group; visibility is independent of profile)
   renderRemapList(profile);
+}
+
+function renderRgbSection(profile) {
+  // Populate the animation dropdown (first time only)
+  const animSelect = $('set-rgb-animation');
+  if (!animSelect.options.length) {
+    for (const opt of RGB_ANIMATIONS) {
+      const o = document.createElement('option');
+      o.value = opt.value;
+      o.textContent = opt.label;
+      animSelect.appendChild(o);
+    }
+  }
+
+  const rgb = getRgbConfig(profile);
+  const anim = rgb?.animation || 'RGB_ANIM_STATIC';
+  animSelect.value = anim;
+
+  const defaultColor = rgb?.defaultColor != null ? Number(rgb.defaultColor) >>> 0 : DEFAULT_LED_COLOR_INT;
+  const hex = colorIntToHex(defaultColor);
+  $('set-rgb-color-picker').value = hex;
+  $('set-rgb-color-hex').value = hex;
+  $('set-rgb-color-hex').classList.remove('invalid');
+
+  $('rgb-static-controls').hidden = (anim !== 'RGB_ANIM_STATIC');
 }
 
 function renderSocdList(profile) {
@@ -1000,71 +1248,275 @@ function buildRemapRow(remap, idx, profile) {
 }
 
 // ---------------------------------------------------------------------------
-// Button assignment modal
+// Output-assignment popup
 // ---------------------------------------------------------------------------
-function openButtonModal(btnId) {
+
+// Reverse of OUTPUT_OPTION_TO_OUTPUT_ID — used when writing menuButtonIcon.
+const OUTPUT_ID_TO_OUTPUT_OPTION = {
+  a: 'OUT_A', b: 'OUT_B', x: 'OUT_X', y: 'OUT_Y',
+  lb: 'OUT_LB', rb: 'OUT_RB', lt: 'OUT_LT', rt: 'OUT_RT',
+  start: 'OUT_XB_START', select: 'OUT_XB_BACK',
+  home: 'OUT_HOME', capture: 'OUT_SW_CAPTURE',
+  dup: 'OUT_DPAD_UP',   ddown: 'OUT_DPAD_DOWN',
+  dleft: 'OUT_DPAD_LEFT', dright: 'OUT_DPAD_RIGHT',
+  ls: 'OUT_L3', rs: 'OUT_R3',
+};
+
+// Logical order for the popup grid.
+const POPUP_OUTPUT_ORDER = [
+  // Face buttons
+  'a', 'b', 'x', 'y',
+  // System
+  'home', 'select', 'start', 'capture',
+  // D-pad (4 directions)
+  'dup', 'ddown', 'dleft', 'dright',
+  // Bumpers / triggers
+  'lb', 'rb', 'lt', 'rt',
+  // Stick clicks
+  'ls', 'rs',
+  // Platform-fighter modifiers
+  'mx', 'my',
+  // Melee analog shield steps
+  'rt_light', 'rt_mid',
+  // L-stick directions
+  'lsu', 'lsd', 'lsl', 'lsr',
+  // C-stick / Right-stick directions
+  'csu', 'csd', 'csl', 'csr',
+];
+
+// Find the physical button that produces a given output in the current mode.
+function findPhysicalButtonForOutput(outputId, modeId) {
+  const modeMap = MODE_OUTPUT_MAP[modeId];
+  if (!modeMap) return null;
+  for (const [btn, out] of Object.entries(modeMap)) {
+    if (out === outputId) return btn;
+  }
+  return null;
+}
+
+// Set of outputs available in the current profile's mode.
+function availableOutputs(modeId) {
+  const modeMap = MODE_OUTPUT_MAP[modeId];
+  if (!modeMap) return new Set();
+  return new Set(Object.values(modeMap));
+}
+
+function openOutputPopup(btnId, _evt) {
   const btn = BUTTON_BY_ID[btnId];
   if (!btn) return;
-
-  selectedBtnId = btnId;
-  buildControllerSVG(); // re-render to highlight selected
-
   const profile = currentProfile();
   if (!profile) return;
 
-  $('modal-physical').textContent = btnId.replace('BTN_', '');
-  $('modal-title').textContent = 'Assign: ' + btnId.replace('BTN_', '');
+  selectedBtnId = btnId;
+  buildControllerSVG();   // re-render to highlight selected (replaces <g> nodes)
 
-  // Find current activates value
-  const existing = profile.buttonRemapping?.find(r => r.physicalButton === btnId);
-  const currentActivates = existing?.activates ?? 'BTN_UNSPECIFIED';
+  $('output-popup-btn-name').textContent = btnId.replace('BTN_', '');
 
-  const activatesSelect = $('modal-activates');
-  activatesSelect.innerHTML = '';
-  // Add "Default (no remap)" option
-  const defOpt = document.createElement('option');
-  defOpt.value = '__default__';
-  defOpt.textContent = '— Default (remove remap entry) —';
-  activatesSelect.appendChild(defOpt);
+  const remappable = canRemap(btnId);
+  const hasLed = hasLED(btnId);
 
-  for (const b of ALL_BUTTONS) {
-    const opt = document.createElement('option');
-    opt.value = b;
-    opt.textContent = b === 'BTN_UNSPECIFIED' ? 'Disabled (BTN_UNSPECIFIED)' : b.replace('BTN_', '');
-    if (b === currentActivates && existing) opt.selected = true;
-    activatesSelect.appendChild(opt);
-  }
-  if (!existing) defOpt.selected = true;
+  // Toggle popup sections based on what this button supports
+  $('output-popup-grid').style.display     = remappable ? '' : 'none';
+  $('output-popup-unmap').style.display    = remappable ? '' : 'none';
+  $('output-popup-color').style.display    = hasLed     ? '' : 'none';
 
-  $('modal-overlay').classList.remove('hidden');
-}
+  const grid = $('output-popup-grid');
+  grid.innerHTML = '';
 
-function closeButtonModal() {
-  $('modal-overlay').classList.add('hidden');
-}
+  if (remappable) {
+    const platformStyle = PLATFORM_STYLES[selectedPlatform] || XBOX_STYLE;
+    const isMenuBtn = btnId.startsWith('BTN_MB');
+    // For menu buttons, allow setting any icon via menuButtonIcon.
+    // For main buttons, only show outputs that some physical button produces in this mode.
+    const available = availableOutputs(profile.modeId);
 
-function applyButtonModal() {
-  const profile = currentProfile();
-  if (!profile) { closeButtonModal(); return; }
-
-  const activates = $('modal-activates').value;
-  if (!profile.buttonRemapping) profile.buttonRemapping = [];
-
-  const existingIdx = profile.buttonRemapping.findIndex(r => r.physicalButton === selectedBtnId);
-
-  if (activates === '__default__') {
-    // Remove the remap entry if it exists
-    if (existingIdx >= 0) profile.buttonRemapping.splice(existingIdx, 1);
-  } else {
-    if (existingIdx >= 0) {
-      profile.buttonRemapping[existingIdx].activates = activates;
-    } else {
-      profile.buttonRemapping.push({ physicalButton: selectedBtnId, activates });
+    for (const outId of POPUP_OUTPUT_ORDER) {
+      if (!isMenuBtn && !available.has(outId)) continue;
+      const style = platformStyle[outId];
+      if (!style) continue;
+      grid.appendChild(renderOutputGlyph(outId, style));
     }
   }
 
-  closeButtonModal();
+  if (hasLed) syncPopupColorControls(btnId);
+
+  positionOutputPopup(btnId);
+  $('output-popup').classList.remove('hidden');
+}
+
+function syncPopupColorControls(btnId) {
+  const profile = currentProfile();
+  if (!profile) return;
+  const color = getButtonColor(profile, btnId);
+  const hex = colorIntToHex(color);
+  $('popup-color-picker').value = hex;
+  $('popup-color-hex').value = hex;
+  $('popup-color-hex').classList.remove('invalid');
+}
+
+function positionOutputPopup(btnId) {
+  const popup = $('output-popup');
+
+  // Look up the (freshly-rendered) <g> for this button so we get its current
+  // screen rect — the original evt.currentTarget is detached after the SVG
+  // rebuild and would yield a zero rect.
+  const target = btnId ? svg().querySelector(`[data-btn="${btnId}"]`) : null;
+  let rect = target?.getBoundingClientRect();
+  if (!rect || (rect.width === 0 && rect.height === 0)) {
+    rect = { left: window.innerWidth/2 - 130, top: 100, right: 0, bottom: 0, width: 0, height: 0 };
+  }
+
+  // Measure popup off-screen
+  popup.style.left = '-9999px';
+  popup.style.top = '0';
+  popup.classList.remove('hidden');
+  const pr = popup.getBoundingClientRect();
+  const popupW = pr.width, popupH = pr.height;
+
+  const gap = 12;
+  let left = rect.right + gap;
+  if (left + popupW > window.innerWidth - 16) left = rect.left - popupW - gap;
+  if (left < 16) left = 16;
+
+  let top = rect.top + rect.height/2 - popupH/2;
+  if (top + popupH > window.innerHeight - 16) top = window.innerHeight - popupH - 16;
+  if (top < 16) top = 16;
+
+  popup.style.left = `${Math.round(left)}px`;
+  popup.style.top  = `${Math.round(top)}px`;
+}
+
+function closeOutputPopup() {
+  $('output-popup').classList.add('hidden');
+  if (selectedBtnId) {
+    selectedBtnId = null;
+    buildControllerSVG();
+  }
+}
+
+function renderOutputGlyph(outputId, style) {
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'output-glyph';
+  el.dataset.output = outputId;
+  // For neutral (non-colored) buttons, use a slightly lighter shade than the
+  // popup card so they pop out. Face buttons with their canonical colors keep
+  // their own background.
+  el.style.background = (style.bg === DARK_BG) ? POPUP_NEUTRAL_BG : style.bg;
+  el.style.color = style.fg;
+  el.title = outputId;
+
+  if (style.kind === 'dpad' || style.kind === 'stick' || style.kind === 'cstick') {
+    el.appendChild(buildArrowGlyph(style.label, style.fg));
+    if (style.kind === 'cstick') {
+      const badge = document.createElement('span');
+      badge.className = 'output-glyph-c-badge';
+      badge.textContent = 'C';
+      el.appendChild(badge);
+    }
+  } else if (style.glyph) {
+    // PS face-button shape (cross / circle / square / triangle)
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 36 36');
+    svg.setAttribute('class', 'output-glyph-arrow');
+    svg.appendChild(buildPSFaceGlyphSvg(style.glyph, style.fg, 18, 18, 12, 4));
+    el.appendChild(svg);
+  } else {
+    el.textContent = style.label;
+  }
+
+  el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    applyOutput(outputId);
+  });
+  return el;
+}
+
+function buildArrowGlyph(direction, color) {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '-10 -10 20 20');
+  svg.setAttribute('class', 'output-glyph-arrow');
+  const armLen = 8, headSize = 4, strokeW = 2;
+  let x1, y1, x2, y2, hx1, hy1, hx2, hy2;
+  if (direction === '↑') {
+    x1=0; y1=armLen/2; x2=0; y2=-armLen/2;
+    hx1=-headSize; hy1=-armLen/2 + headSize; hx2=headSize; hy2=-armLen/2 + headSize;
+  } else if (direction === '↓') {
+    x1=0; y1=-armLen/2; x2=0; y2=armLen/2;
+    hx1=-headSize; hy1=armLen/2 - headSize; hx2=headSize; hy2=armLen/2 - headSize;
+  } else if (direction === '←') {
+    x1=armLen/2; y1=0; x2=-armLen/2; y2=0;
+    hx1=-armLen/2 + headSize; hy1=-headSize; hx2=-armLen/2 + headSize; hy2=headSize;
+  } else {
+    x1=-armLen/2; y1=0; x2=armLen/2; y2=0;
+    hx1=armLen/2 - headSize; hy1=-headSize; hx2=armLen/2 - headSize; hy2=headSize;
+  }
+  for (const [a, b, c, d] of [[x1,y1,x2,y2], [hx1,hy1,x2,y2], [hx2,hy2,x2,y2]]) {
+    const ln = document.createElementNS(NS, 'line');
+    ln.setAttribute('x1', a); ln.setAttribute('y1', b);
+    ln.setAttribute('x2', c); ln.setAttribute('y2', d);
+    ln.setAttribute('stroke', color);
+    ln.setAttribute('stroke-width', strokeW);
+    ln.setAttribute('stroke-linecap', 'round');
+    ln.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(ln);
+  }
+  return svg;
+}
+
+function emptyMenuIconArray() {
+  return ['OUT_UNSPECIFIED','OUT_UNSPECIFIED','OUT_UNSPECIFIED','OUT_UNSPECIFIED','OUT_UNSPECIFIED','OUT_UNSPECIFIED','OUT_UNSPECIFIED'];
+}
+
+function applyOutput(outputId) {
+  const profile = currentProfile();
+  if (!profile || !selectedBtnId) { closeOutputPopup(); return; }
+
+  // Menu buttons: write to menuButtonIcon
+  if (selectedBtnId.startsWith('BTN_MB')) {
+    const mbIdx = parseInt(selectedBtnId.slice(6), 10) - 1;
+    if (!profile.menuButtonIcon) profile.menuButtonIcon = emptyMenuIconArray();
+    profile.menuButtonIcon[mbIdx] = OUTPUT_ID_TO_OUTPUT_OPTION[outputId] || 'OUT_UNSPECIFIED';
+    closeOutputPopup();
+    renderAll();
+    return;
+  }
+
+  // Main buttons: figure out which physical button produces this output in this mode,
+  // then write a buttonRemapping entry (selectedBtn -> phys).
+  const phys = findPhysicalButtonForOutput(outputId, profile.modeId);
+  if (!phys) { closeOutputPopup(); return; }
+  setRemap(selectedBtnId, phys);
+  closeOutputPopup();
   renderAll();
+}
+
+function unmapSelected() {
+  const profile = currentProfile();
+  if (!profile || !selectedBtnId) { closeOutputPopup(); return; }
+
+  if (selectedBtnId.startsWith('BTN_MB')) {
+    const mbIdx = parseInt(selectedBtnId.slice(6), 10) - 1;
+    if (!profile.menuButtonIcon) profile.menuButtonIcon = emptyMenuIconArray();
+    profile.menuButtonIcon[mbIdx] = 'OUT_UNSPECIFIED';
+  } else {
+    // Disable button: { physicalButton: BTN_X } with no activates.
+    setRemap(selectedBtnId, null);
+  }
+  closeOutputPopup();
+  renderAll();
+}
+
+function setRemap(physBtnId, activates) {
+  const profile = currentProfile();
+  if (!profile) return;
+  if (!profile.buttonRemapping) profile.buttonRemapping = [];
+  const idx = profile.buttonRemapping.findIndex(r => r.physicalButton === physBtnId);
+  const entry = activates ? { physicalButton: physBtnId, activates } : { physicalButton: physBtnId };
+  if (idx >= 0) profile.buttonRemapping[idx] = entry;
+  else profile.buttonRemapping.push(entry);
 }
 
 // ---------------------------------------------------------------------------
@@ -1095,9 +1547,53 @@ function wireSettingsHandlers() {
     renderProfileList();
   });
 
-  $('set-layout-plate').addEventListener('change', () => {
+  // Collapsible Button Remapping section
+  $('remap-toggle').addEventListener('click', () => {
+    const toggle = $('remap-toggle');
+    const body = $('remap-body');
+    const expanded = toggle.getAttribute('aria-expanded') === 'true';
+    toggle.setAttribute('aria-expanded', String(!expanded));
+    body.hidden = expanded;  // hide when previously expanded
+  });
+
+  // RGB animation dropdown
+  $('set-rgb-animation').addEventListener('change', () => {
     const p = currentProfile();
-    if (p) p.layoutPlate = $('set-layout-plate').value;
+    if (!p) return;
+    const rgb = ensureRgbConfig(p);
+    rgb.animation = $('set-rgb-animation').value;
+    $('rgb-static-controls').hidden = (rgb.animation !== 'RGB_ANIM_STATIC');
+  });
+
+  // RGB color picker (live updates the hex field; doesn't apply until "Apply to mapped buttons")
+  $('set-rgb-color-picker').addEventListener('input', (e) => {
+    const colorInt = parseHexInput(e.target.value);
+    if (colorInt == null) return;
+    $('set-rgb-color-hex').value = colorIntToHex(colorInt);
+    $('set-rgb-color-hex').classList.remove('invalid');
+  });
+
+  $('set-rgb-color-hex').addEventListener('input', (e) => {
+    const colorInt = parseHexInput(e.target.value);
+    if (colorInt == null) { e.target.classList.add('invalid'); return; }
+    e.target.classList.remove('invalid');
+    $('set-rgb-color-picker').value = colorIntToHex(colorInt);
+  });
+
+  // Apply the static color to every currently-mapped button in this profile.
+  $('btn-apply-rgb').addEventListener('click', () => {
+    const p = currentProfile();
+    if (!p) return;
+    const colorInt = parseHexInput($('set-rgb-color-hex').value);
+    if (colorInt == null) { $('set-rgb-color-hex').classList.add('invalid'); return; }
+    const rgb = ensureRgbConfig(p);
+    rgb.defaultColor = colorInt;
+    const rmap = remapMap(p);
+    for (const btn of BUTTON_LAYOUT) {
+      const out = resolveButtonOutput(btn.id, p, rmap);
+      if (out) setButtonColor(p, btn.id, colorInt);
+    }
+    buildControllerSVG();
   });
 
   $('btn-add-socd').addEventListener('click', () => {
@@ -1149,11 +1645,62 @@ function wireToolbarHandlers() {
     });
   });
 
-  // Modal
-  $('modal-close').addEventListener('click', closeButtonModal);
-  $('modal-cancel').addEventListener('click', closeButtonModal);
-  $('modal-ok').addEventListener('click', applyButtonModal);
-  $('modal-overlay').addEventListener('click', e => { if (e.target === $('modal-overlay')) closeButtonModal(); });
+  // Output popup
+  $('output-popup-close').addEventListener('click', closeOutputPopup);
+  $('output-popup-unmap').addEventListener('click', unmapSelected);
+
+  // Popup LED color controls
+  $('popup-color-picker').addEventListener('input', (e) => {
+    const profile = currentProfile();
+    if (!profile || !selectedBtnId) return;
+    const colorInt = parseHexInput(e.target.value);
+    if (colorInt == null) return;
+    setButtonColor(profile, selectedBtnId, colorInt);
+    $('popup-color-hex').value = colorIntToHex(colorInt);
+    $('popup-color-hex').classList.remove('invalid');
+    applyLiveButtonColor(selectedBtnId, colorInt);
+  });
+
+  $('popup-color-hex').addEventListener('input', (e) => {
+    const profile = currentProfile();
+    if (!profile || !selectedBtnId) return;
+    const colorInt = parseHexInput(e.target.value);
+    if (colorInt == null) {
+      e.target.classList.add('invalid');
+      return;
+    }
+    e.target.classList.remove('invalid');
+    setButtonColor(profile, selectedBtnId, colorInt);
+    $('popup-color-picker').value = colorIntToHex(colorInt);
+    applyLiveButtonColor(selectedBtnId, colorInt);
+  });
+
+  $('popup-remove-lighting').addEventListener('click', () => {
+    const profile = currentProfile();
+    if (!profile || !selectedBtnId) return;
+    setButtonColor(profile, selectedBtnId, 0);
+    $('popup-color-picker').value = '#000000';
+    $('popup-color-hex').value = '#000000';
+    $('popup-color-hex').classList.remove('invalid');
+    applyLiveButtonColor(selectedBtnId, 0);
+  });
+
+  // Close popup on outside-click (but ignore clicks on controller buttons —
+  // those re-open the popup with the new button's context).
+  document.addEventListener('click', (e) => {
+    const popup = $('output-popup');
+    if (popup.classList.contains('hidden')) return;
+    if (popup.contains(e.target)) return;
+    if (e.target.closest('.btn-group')) return;
+    closeOutputPopup();
+  });
+
+  // Close popup on Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (!$('output-popup').classList.contains('hidden')) closeOutputPopup();
+    else if (!$('help-overlay').classList.contains('hidden')) $('help-overlay').classList.add('hidden');
+  });
 
   // Help
   $('btn-help').addEventListener('click', () => $('help-overlay').classList.remove('hidden'));
@@ -1170,8 +1717,12 @@ function escHtml(s) {
 
 // ---------------------------------------------------------------------------
 // Default config (embedded JSON)
+// Source: GlyphUserProfiles.json — the official Limit Labs default profiles.
+// Each non-default-output button is explicitly listed in buttonRemapping with
+// an empty `activates` field, marking it as disabled in that profile. This is
+// how the original configurator decides which buttons to grey out.
 // ---------------------------------------------------------------------------
-const DEFAULT_CONFIG_JSON = JSON.stringify({"gameModeConfigs":[{"modeId":"MODE_MELEE","name":"Melee","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP_NO_REAC"}],"buttonRemapping":[],"rgbConfig":1,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_XINPUT","COMMS_BACKEND_DINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_PROJECT_M","name":"Brawl","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP_NO_REAC"}],"buttonRemapping":[],"rgbConfig":2,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_XINPUT","COMMS_BACKEND_DINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_ULTIMATE","name":"Ultimate","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP"}],"buttonRemapping":[],"rgbConfig":3,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_XINPUT","COMMS_BACKEND_DINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_FGC","name":"Split FGC","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_LT1","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_RT1","activates":"BTN_LT1"},{"physicalButton":"BTN_LF5","activates":"BTN_LT2"},{"physicalButton":"BTN_RF9","activates":"BTN_RT1"}],"rgbConfig":4,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_XINPUT","COMMS_BACKEND_DINPUT","COMMS_BACKEND_NINTENDO_SWITCH"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_XB_START"]},{"modeId":"MODE_FGC","name":"FGC","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_LT1","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_RF10","activates":"BTN_RF1"},{"physicalButton":"BTN_RF11","activates":"BTN_RF2"},{"physicalButton":"BTN_RF12","activates":"BTN_RF3"},{"physicalButton":"BTN_RF1","activates":"BTN_RF4"},{"physicalButton":"BTN_RF13","activates":"BTN_RF5"},{"physicalButton":"BTN_RF14","activates":"BTN_RF6"},{"physicalButton":"BTN_RF15","activates":"BTN_RF7"},{"physicalButton":"BTN_RF5","activates":"BTN_RF8"},{"physicalButton":"BTN_LF6","activates":"BTN_LF1"},{"physicalButton":"BTN_LF7","activates":"BTN_LF2"},{"physicalButton":"BTN_LF8","activates":"BTN_LF3"},{"physicalButton":"BTN_LT6","activates":"BTN_LT1"},{"physicalButton":"BTN_RF16","activates":"BTN_LT2"}],"rgbConfig":5,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_XINPUT","COMMS_BACKEND_DINPUT","COMMS_BACKEND_NINTENDO_SWITCH"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_XB_START"]},{"modeId":"MODE_64","name":"Smash64","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[],"rgbConfig":6,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_N64"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_START"]},{"modeId":"MODE_RIVALS_OF_AETHER","name":"RoA","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP"}],"buttonRemapping":[{"physicalButton":"BTN_RF7","activates":"BTN_LF7"},{"physicalButton":"BTN_RF8","activates":"BTN_LT6"}],"rgbConfig":7,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_XINPUT","COMMS_BACKEND_DINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_RIVALS2","name":"RoA2","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP"}],"buttonRemapping":[{"physicalButton":"BTN_RF7","activates":"BTN_LF7"},{"physicalButton":"BTN_RF8","activates":"BTN_LT6"}],"rgbConfig":8,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_XINPUT","COMMS_BACKEND_DINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]}],"communicationBackendConfigs":[{"backendId":"COMMS_BACKEND_XINPUT","defaultModeConfig":1},{"backendId":"COMMS_BACKEND_NINTENDO_SWITCH","defaultModeConfig":1},{"backendId":"COMMS_BACKEND_DINPUT","defaultModeConfig":1},{"backendId":"COMMS_BACKEND_GAMECUBE","defaultModeConfig":1},{"backendId":"COMMS_BACKEND_N64","defaultModeConfig":6},{"backendId":"COMMS_BACKEND_CONFIGURATOR","activationBinding":["BTN_RT2"]}],"keyboardModes":[],"rgbConfigs":[],"defaultBackendConfig":1,"defaultUsbBackendConfig":1,"rgbBrightness":255,"defaultDashboardOption":"DASHBOARD_MENU_BUTTON_HINTS"});
+const DEFAULT_CONFIG_JSON = `{"gameModeConfigs":[{"modeId":"MODE_MELEE","name":"Melee","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP_NO_REAC"}],"buttonRemapping":[{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":1,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_PROJECT_M","name":"Brawl","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP_NO_REAC"}],"buttonRemapping":[{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":2,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_ULTIMATE","name":"Ultimate","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP"}],"buttonRemapping":[{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":3,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_FGC","name":"Split FGC","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_LT1","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_RT1","activates":"BTN_LT1"},{"physicalButton":"BTN_LF5","activates":"BTN_LT2"},{"physicalButton":"BTN_RF9","activates":"BTN_RT1"},{"physicalButton":"BTN_LF4"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT2"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_RT2"},{"physicalButton":"BTN_RT3"},{"physicalButton":"BTN_RT4"},{"physicalButton":"BTN_RT5"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":4,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_XB_START"]},{"modeId":"MODE_FGC","name":"FGC","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_LT1","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_RF1","activates":"BTN_RF4"},{"physicalButton":"BTN_RF5","activates":"BTN_RF8"},{"physicalButton":"BTN_LF8","activates":"BTN_LF3"},{"physicalButton":"BTN_LF7","activates":"BTN_LF2"},{"physicalButton":"BTN_LF6","activates":"BTN_LF1"},{"physicalButton":"BTN_LT6","activates":"BTN_LT1"},{"physicalButton":"BTN_RF10","activates":"BTN_RF1"},{"physicalButton":"BTN_RF11","activates":"BTN_RF2"},{"physicalButton":"BTN_RF12","activates":"BTN_RF3"},{"physicalButton":"BTN_RF13","activates":"BTN_RF5"},{"physicalButton":"BTN_RF14","activates":"BTN_RF6"},{"physicalButton":"BTN_RF15","activates":"BTN_RF7"},{"physicalButton":"BTN_RF16","activates":"BTN_LT2"},{"physicalButton":"BTN_LF1"},{"physicalButton":"BTN_LF2"},{"physicalButton":"BTN_LF3"},{"physicalButton":"BTN_LF4"},{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LT1"},{"physicalButton":"BTN_LT2"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_RF2"},{"physicalButton":"BTN_RF3"},{"physicalButton":"BTN_RF4"},{"physicalButton":"BTN_RF6"},{"physicalButton":"BTN_RF7"},{"physicalButton":"BTN_RF8"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RT1"},{"physicalButton":"BTN_RT2"},{"physicalButton":"BTN_RT3"},{"physicalButton":"BTN_RT4"},{"physicalButton":"BTN_RT5"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":5,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_XB_START"]},{"modeId":"MODE_64","name":"Smash64","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_RT2"},{"physicalButton":"BTN_RT3"},{"physicalButton":"BTN_RT4"},{"physicalButton":"BTN_RT5"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"},{"physicalButton":"BTN_MB4"},{"physicalButton":"BTN_MB5"},{"physicalButton":"BTN_MB6"}],"rgbConfig":6,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_N64"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_START"]},{"modeId":"MODE_RIVALS_OF_AETHER","name":"RoA","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP"}],"buttonRemapping":[{"physicalButton":"BTN_RF7","activates":"BTN_LF7"},{"physicalButton":"BTN_RF8","activates":"BTN_LT6"},{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":7,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_RIVALS2","name":"RoA2","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP"}],"buttonRemapping":[{"physicalButton":"BTN_RF7","activates":"BTN_LF7"},{"physicalButton":"BTN_RF8","activates":"BTN_LT6"},{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":8,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_MELEE","name":"GameCube","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_LF2","activates":"BTN_RF4"},{"physicalButton":"BTN_LF6","activates":"BTN_LF8"},{"physicalButton":"BTN_LF5","activates":"BTN_LF2"},{"physicalButton":"BTN_RF13","activates":"BTN_LT6"},{"physicalButton":"BTN_RF10","activates":"BTN_LF7"},{"physicalButton":"BTN_RF11","activates":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF4"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":9,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_MELEE","name":"N64","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_LF2","activates":"BTN_RF4"},{"physicalButton":"BTN_RF2","activates":"BTN_RF5"},{"physicalButton":"BTN_LF6","activates":"BTN_LF8"},{"physicalButton":"BTN_LF5","activates":"BTN_LF2"},{"physicalButton":"BTN_RF13","activates":"BTN_LT6"},{"physicalButton":"BTN_RF11","activates":"BTN_LF6"},{"physicalButton":"BTN_RF10","activates":"BTN_LF7"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF4"},{"physicalButton":"BTN_RF5"},{"physicalButton":"BTN_RF6"},{"physicalButton":"BTN_RF7"},{"physicalButton":"BTN_RF8"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":10,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_N64"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_FGC","name":"SNES","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_LT1","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_LF2","activates":"BTN_LT1"},{"physicalButton":"BTN_LT1","activates":"BTN_RF8"},{"physicalButton":"BTN_RT1","activates":"BTN_RF7"},{"physicalButton":"BTN_RF1","activates":"BTN_RF2"},{"physicalButton":"BTN_RF2","activates":"BTN_RF1"},{"physicalButton":"BTN_RF5","activates":"BTN_RF6"},{"physicalButton":"BTN_RF6","activates":"BTN_RF5"},{"physicalButton":"BTN_LF5","activates":"BTN_LF2"},{"physicalButton":"BTN_LF4"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT2"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF3"},{"physicalButton":"BTN_RF4"},{"physicalButton":"BTN_RF7"},{"physicalButton":"BTN_RF8"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_RT2"},{"physicalButton":"BTN_RT3"},{"physicalButton":"BTN_RT4"},{"physicalButton":"BTN_RT5"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"},{"physicalButton":"BTN_MB4"},{"physicalButton":"BTN_MB5"}],"rgbConfig":11,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_SNES"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_FGC","name":"NES","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_LT1","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_LF2","activates":"BTN_LT1"},{"physicalButton":"BTN_RF1","activates":"BTN_RF2"},{"physicalButton":"BTN_RF2","activates":"BTN_RF1"},{"physicalButton":"BTN_LF5","activates":"BTN_LF2"},{"physicalButton":"BTN_LF4"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT1"},{"physicalButton":"BTN_LT2"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF3"},{"physicalButton":"BTN_RF4"},{"physicalButton":"BTN_RF5"},{"physicalButton":"BTN_RF6"},{"physicalButton":"BTN_RF7"},{"physicalButton":"BTN_RF8"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_RT1"},{"physicalButton":"BTN_RT2"},{"physicalButton":"BTN_RT3"},{"physicalButton":"BTN_RT4"},{"physicalButton":"BTN_RT5"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"},{"physicalButton":"BTN_MB4"},{"physicalButton":"BTN_MB5"}],"rgbConfig":12,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_NES"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_KEYBOARD","name":"Keyboard","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_LT1","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP"}],"keyboardModeConfig":1,"rgbConfig":13,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT"]}],"communicationBackendConfigs":[{"backendId":"COMMS_BACKEND_XINPUT","defaultModeConfig":1},{"backendId":"COMMS_BACKEND_NINTENDO_SWITCH","defaultModeConfig":1},{"backendId":"COMMS_BACKEND_DINPUT","defaultModeConfig":1},{"backendId":"COMMS_BACKEND_GAMECUBE","defaultModeConfig":1},{"backendId":"COMMS_BACKEND_N64","defaultModeConfig":6},{"backendId":"COMMS_BACKEND_NES","defaultModeConfig":12},{"backendId":"COMMS_BACKEND_SNES","defaultModeConfig":11},{"backendId":"COMMS_BACKEND_CONFIGURATOR","activationBinding":["BTN_RT2"]}],"keyboardModes":[{"buttonsToKeycodes":[{"button":"BTN_LF1","keycode":4},{"button":"BTN_LF2","keycode":5},{"button":"BTN_LF3","keycode":6},{"button":"BTN_LF4","keycode":7},{"button":"BTN_LF5","keycode":8},{"button":"BTN_LF6","keycode":9},{"button":"BTN_LF7","keycode":10},{"button":"BTN_LF8","keycode":11},{"button":"BTN_LT1","keycode":12},{"button":"BTN_LT2","keycode":13},{"button":"BTN_LT3","keycode":14},{"button":"BTN_LT4","keycode":15},{"button":"BTN_LT5","keycode":16},{"button":"BTN_LT6","keycode":17},{"button":"BTN_RF1","keycode":18},{"button":"BTN_RF2","keycode":19},{"button":"BTN_RF3","keycode":20},{"button":"BTN_RF4","keycode":21},{"button":"BTN_RF5","keycode":22},{"button":"BTN_RF6","keycode":23},{"button":"BTN_RF7","keycode":24},{"button":"BTN_RF8","keycode":25},{"button":"BTN_RF9","keycode":26},{"button":"BTN_RF10","keycode":27},{"button":"BTN_RF11","keycode":28},{"button":"BTN_RF12","keycode":29},{"button":"BTN_RF13","keycode":30},{"button":"BTN_RF14","keycode":31},{"button":"BTN_RF15","keycode":32},{"button":"BTN_RF16","keycode":33},{"button":"BTN_RT1","keycode":34},{"button":"BTN_RT2","keycode":35},{"button":"BTN_RT3","keycode":36},{"button":"BTN_RT4","keycode":37},{"button":"BTN_RT5","keycode":38}]}],"defaultBackendConfig":1,"defaultUsbBackendConfig":1,"rgbBrightness":255,"defaultDashboardOption":"DASHBOARD_MENU_BUTTON_HINTS"}`;
 
 // ---------------------------------------------------------------------------
 // Init
