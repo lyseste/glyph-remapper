@@ -15,7 +15,25 @@
   <header class="toolbar">
     <div class="toolbar-left">
       <div class="logo">
-        <svg viewBox="0 0 32 32" width="36" height="36"><circle cx="16" cy="16" r="14" fill="none" stroke="#22d3ee" stroke-width="2"/><circle cx="16" cy="16" r="6" fill="#22d3ee"/></svg>
+        <svg viewBox="0 0 722 722" width="36" height="36" xmlns="http://www.w3.org/2000/svg" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+          <g transform="matrix(1,0,0,1,-139.016449,-139.016449)">
+            <g transform="matrix(1.502856,0,0,1.502856,-251.428243,-251.428243)">
+              <path d="M500,740.198C367.431,740.198 259.802,632.569 259.802,500C259.802,367.431 367.431,259.802 500,259.802C632.569,259.802 740.198,367.431 740.198,500L680.19,500C680.19,400.55 599.45,319.81 500,319.81C400.55,319.81 319.81,400.55 319.81,500C319.81,599.45 400.55,680.19 500,680.19L500,740.198Z" fill="rgb(34,211,238)"/>
+            </g>
+            <g transform="matrix(0.580175,0.580175,-0.580175,0.580175,502.995068,-82.862672)">
+              <path d="M404.415,244L595.776,244L595.776,359.245L499.735,455.286L404.717,360.268L404.415,244Z" fill="white"/>
+            </g>
+            <g transform="matrix(-0.580175,0.580175,-0.580175,-0.580175,1082.862672,502.995068)">
+              <path d="M404.415,244L595.776,244L595.776,359.245L499.735,455.286L404.717,360.268L404.415,244Z" fill="rgb(34,211,238)"/>
+            </g>
+            <g transform="matrix(-0.580175,-0.580175,0.580175,-0.580175,497.004932,1082.862672)">
+              <path d="M404.415,244L595.776,244L595.776,359.245L499.735,455.286L404.717,360.268L404.415,244Z" fill="white"/>
+            </g>
+            <g transform="matrix(0.580175,-0.580175,0.580175,0.580175,-82.862672,497.004932)">
+              <path d="M404.415,244L595.776,244L595.776,359.245L499.735,455.286L404.717,360.268L404.415,244Z" fill="white"/>
+            </g>
+          </g>
+        </svg>
         <span class="logo-text">open Glyph Remapper</span>
       </div>
       <button id="btn-connect" class="btn btn-primary" title="Connect to Glyph in Configurator mode (hold RT2 while plugging in)">
@@ -67,6 +85,7 @@
           <button class="platform-tab active" data-platform="xbox">Xbox</button>
           <button class="platform-tab" data-platform="playstation">PlayStation</button>
           <button class="platform-tab" data-platform="switch">Switch</button>
+          <button class="platform-tab platform-tab-gc hidden" data-platform="gamecube">GameCube</button>
         </div>
       </div>
       <div id="no-profile-msg" class="no-profile-msg">
@@ -103,7 +122,7 @@
           <select id="set-rgb-animation" class="setting-select"></select>
           <div id="rgb-static-controls" class="rgb-static-controls" hidden>
             <div class="rgb-color-row">
-              <input type="color" id="set-rgb-color-picker" class="rgb-color-picker" value="#22d3ee" aria-label="Static color picker">
+              <button type="button" id="set-rgb-color-swatch" class="rgb-color-swatch" aria-label="Open color picker" style="background:#22d3ee"></button>
               <input type="text" id="set-rgb-color-hex" class="rgb-color-hex setting-input" value="#22d3ee" maxlength="7" spellcheck="false" aria-label="Static color hex">
             </div>
             <button type="button" id="btn-apply-rgb" class="btn btn-small">Apply to mapped buttons</button>
@@ -116,7 +135,14 @@
           </button>
           <div id="remap-body" class="setting-collapse-body" hidden>
             <div id="remap-list" class="remap-list"></div>
-            <button id="btn-add-remap" class="btn btn-small">+ Add Remap</button>
+            <div class="remap-footer">
+              <button id="btn-add-remap" class="btn btn-small">+ Add Remap</button>
+              <label class="remap-mode-switch" title="Show raw button-to-button remaps">
+                <input type="checkbox" id="chk-remap-mode">
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                <span class="toggle-label">Advanced</span>
+              </label>
+            </div>
           </div>
         </div>
       </div>
@@ -136,11 +162,11 @@
       <div class="output-popup-hint">Captures one HID key per button. Bypasses Button Remapping in keyboard mode.</div>
     </div>
     <div id="output-popup-color" class="output-popup-color">
-      <input type="color" id="popup-color-picker" class="popup-color-picker" value="#22d3ee" aria-label="LED color picker">
+      <button type="button" id="popup-color-swatch" class="popup-color-swatch" aria-label="Open color picker" style="background:#22d3ee"></button>
       <input type="text" id="popup-color-hex" class="popup-color-hex" value="#22d3ee" maxlength="7" spellcheck="false" aria-label="LED hex color">
       <button type="button" id="popup-remove-lighting" class="popup-remove-lighting" title="Turn LED off for this button" aria-label="Turn LED off">⊘</button>
     </div>
-    <button id="output-popup-unmap" class="output-popup-unmap">un-map</button>
+    <button id="output-popup-unmap" class="output-popup-unmap">UNBIND</button>
   </div>
 
   <!-- Help modal -->
@@ -170,6 +196,16 @@
         <p>Use <strong>Export JSON</strong> / <strong>Import JSON</strong> to save and restore configs offline.</p>
         <p>The JSON format is compatible with the official Glyph Configurator.</p>
       </div>
+    </div>
+  </div>
+
+  <!-- Custom HSV color picker (shared, floating) -->
+  <div id="hsl-picker" class="hsl-picker hidden">
+    <div id="hsl-sv-area" class="hsl-sv-area">
+      <div id="hsl-sv-thumb" class="hsl-sv-thumb"></div>
+    </div>
+    <div id="hsl-hue-track" class="hsl-hue-track">
+      <div id="hsl-hue-thumb" class="hsl-hue-thumb"></div>
     </div>
   </div>
 
