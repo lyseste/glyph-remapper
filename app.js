@@ -202,6 +202,22 @@ const PROJECT_M_MAP = {
   BTN_RF9: 'rt_light',
 };
 
+// Rivals of Aether: same as PFM but RF9 fires the XInput LB bumper.
+// Source: src/modes/RivalsOfAether.cpp:62 — outputs.buttonL = inputs.rf9;
+// (the GameCube backend silently discards buttonL, so LB only effectively
+// triggers when the XInput / DInput / Switch backend is active.)
+const ROA_MAP = {
+  ...PLATFORM_FIGHTER_MAP,
+  BTN_RF9: 'lb',
+};
+
+// Rivals 2: same as PFM but LT5 fires the XInput LB bumper.
+// Source: src/modes/Rivals2.cpp:28 — outputs.buttonL = inputs.lt5;
+const ROA2_MAP = {
+  ...PLATFORM_FIGHTER_MAP,
+  BTN_LT5: 'lb',
+};
+
 // Smash 64 mode (src/modes/64.cpp) - c-pad uses RF7/RF8/RF2/RF6 (NOT RT cluster)
 const SMASH64_MAP = {
   BTN_RT1: 'a', BTN_RF1: 'b',
@@ -219,11 +235,109 @@ const MODE_OUTPUT_MAP = {
   MODE_FGC: FGC_MAP,
   MODE_ULTIMATE: PLATFORM_FIGHTER_MAP,
   MODE_PROJECT_M: PROJECT_M_MAP,
-  MODE_RIVALS_OF_AETHER: PLATFORM_FIGHTER_MAP,
-  MODE_RIVALS2: PLATFORM_FIGHTER_MAP,
+  MODE_RIVALS_OF_AETHER: ROA_MAP,
+  MODE_RIVALS2: ROA2_MAP,
   MODE_MELEE: MELEE_MAP,
   MODE_64: SMASH64_MAP,
   // keyboard / custom – left undefined; falls back to blank
+};
+
+// When the user changes a profile's modeId we want EVERY button's effective
+// output to stay the same, including ones whose outputs come from the old
+// mode's native defaults rather than from an explicit remap entry. We do this
+// by walking every physical button, resolving its current output under the
+// old mode, then writing a remap entry in the new mode that re-points the
+// button at whichever new-mode slot natively produces that same output.
+//
+// Rules:
+//   * Explicit disables (no `activates`)         → left alone
+//   * MB buttons (menuButtonIcon-driven)         → left alone
+//   * If the new mode natively produces the same output on the same physical
+//     button, any pre-existing remap entry for that button is REMOVED (keeps
+//     the data clean — no redundant entries)
+//   * If the output simply doesn't exist in the new mode (e.g. `mx`/`my` going
+//     into FGC), any pre-existing remap entry is left alone so the button
+//     still does what it always did on that target (or becomes the new mode's
+//     default for that slot if there's no remap).
+function preserveOutputsAcrossModeChange(profile, oldMode, newMode) {
+  // Keyboard mode bypasses buttonRemapping entirely (CustomKeyboardMode.cpp),
+  // so there's nothing meaningful to convert across a keyboard transition.
+  if (oldMode === 'MODE_KEYBOARD' || newMode === 'MODE_KEYBOARD') return;
+
+  const oldModeMap = MODE_OUTPUT_MAP[oldMode] || {};
+  const newModeMap = MODE_OUTPUT_MAP[newMode] || {};
+
+  if (!Array.isArray(profile.buttonRemapping)) profile.buttonRemapping = [];
+
+  // Snapshot the *effective* output of every non-menu button under the OLD mode.
+  const rmap = remapMap(profile);
+  const oldEffective = {};  // physBtnId → outputId
+  for (const btn of BUTTON_LAYOUT) {
+    if (btn.id.startsWith('BTN_MB')) continue;
+    // Don't touch explicit disables — the user disabled the button on purpose,
+    // regardless of mode.
+    const existing = profile.buttonRemapping.find(r => r.physicalButton === btn.id);
+    if (existing && (!existing.activates || existing.activates === 'BTN_UNSPECIFIED')) {
+      continue;
+    }
+    const logical = resolveLogicalButton(btn.id, rmap);
+    if (!logical) continue;
+    const out = oldModeMap[logical];
+    if (out) oldEffective[btn.id] = out;
+  }
+
+  // Reverse index for the new mode: outputId → physicalButton it lives on.
+  const newOutputToBtn = {};
+  for (const [phys, out] of Object.entries(newModeMap)) {
+    if (!(out in newOutputToBtn)) newOutputToBtn[out] = phys;
+  }
+
+  // For each preserved button, install whatever remap entry is required so
+  // that the new-mode resolution lands back on the same output.
+  for (const [physBtn, desiredOutput] of Object.entries(oldEffective)) {
+    const newTarget = newOutputToBtn[desiredOutput];
+    const idx = profile.buttonRemapping.findIndex(r => r.physicalButton === physBtn);
+
+    if (newTarget == null) {
+      // The desired output doesn't exist in the new mode (e.g. mx/my going
+      // into FGC). Disable the button explicitly instead of letting the new
+      // mode's native default take over — the user wants the bind to simply
+      // disappear, and they can re-add it manually if they switch back.
+      const disableEntry = { physicalButton: physBtn };
+      if (idx >= 0) profile.buttonRemapping[idx] = disableEntry;
+      else          profile.buttonRemapping.push(disableEntry);
+      continue;
+    }
+
+    if (newModeMap[physBtn] === desiredOutput) {
+      // The new mode's native default for this physical button already matches —
+      // drop any remap entry so the data stays clean.
+      if (idx >= 0) profile.buttonRemapping.splice(idx, 1);
+      continue;
+    }
+
+    const entry = { physicalButton: physBtn, activates: newTarget };
+    if (idx >= 0) profile.buttonRemapping[idx] = entry;
+    else          profile.buttonRemapping.push(entry);
+  }
+}
+
+// Menu buttons (MB4-MB7) get their outputs hardcoded by the firmware regardless
+// of the profile's `menuButtonIcon` field — `menuButtonIcon` is purely a display
+// hint. Sources (Ultimate.cpp, Rivals*.cpp, ProjectM.cpp, Melee20Button.cpp,
+// FgcMode.cpp, 64.cpp):
+//   outputs.start   = inputs.mb7;
+//   outputs.select  = inputs.mb6;
+//   outputs.home    = inputs.mb5;
+//   outputs.capture = inputs.mb4;
+// So fall back to these defaults when the profile leaves menuButtonIcon as
+// OUT_UNSPECIFIED — most notably the official defaults leave MB4 unspec but
+// the device still emits Capture.
+const MENU_BUTTON_FIRMWARE_DEFAULTS = {
+  BTN_MB4: 'capture',
+  BTN_MB5: 'home',
+  BTN_MB6: 'select',
+  BTN_MB7: 'start',
 };
 
 // Map proto OutputOption enum values (used in profile.menuButtonIcon) to our
@@ -1153,12 +1267,21 @@ function resolveLogicalButton(physBtnId, rmap) {
 function resolveButtonOutput(physBtnId, profile, rmap) {
   if (!profile) return null;
 
-  // Menu buttons (MB1-MB7) display whatever menuButtonIcon says.
+  // Menu buttons (MB1-MB7):
+  //   1. If menuButtonIcon[i] is set explicitly, use that (the per-profile UI override).
+  //   2. Otherwise fall back to the firmware's hardcoded MB→output mapping
+  //      (MB4=capture, MB5=home, MB6=select, MB7=start) — these are wired in
+  //      every controller mode, so showing the icon here reflects what the
+  //      device actually emits.
   if (physBtnId.startsWith('BTN_MB')) {
     const mbIdx = parseInt(physBtnId.slice(6), 10) - 1;
     const outOpt = profile.menuButtonIcon?.[mbIdx];
-    if (!outOpt || outOpt === 'OUT_UNSPECIFIED') return null;
-    return OUTPUT_OPTION_TO_OUTPUT_ID[outOpt] || null;
+    if (outOpt && outOpt !== 'OUT_UNSPECIFIED') {
+      return OUTPUT_OPTION_TO_OUTPUT_ID[outOpt] || null;
+    }
+    // Keyboard mode doesn't emit gamepad outputs, so no MB defaults.
+    if (isKeyboardProfile(profile)) return null;
+    return MENU_BUTTON_FIRMWARE_DEFAULTS[physBtnId] || null;
   }
 
   const logical = resolveLogicalButton(physBtnId, rmap);
@@ -1485,6 +1608,7 @@ function renderProfileList() {
     `;
     item.addEventListener('click', e => {
       if (e.target.classList.contains('profile-item-del')) return;
+      if (e.target.classList.contains('profile-item-name-input')) return;  // editing
       selectedProfileIdx = i;
       selectedBtnId = null;
       renderAll();
@@ -1493,11 +1617,115 @@ function renderProfileList() {
       e.stopPropagation();
       if (confirm(`Delete profile "${p.name || 'Unnamed'}"?`)) deleteProfile(i);
     });
+    item.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      openProfileContextMenu(i, e.clientX, e.clientY);
+    });
     list.appendChild(item);
   });
 
   const noProfileMsg = $('no-profile-msg');
   noProfileMsg.style.display = profiles.length === 0 ? 'block' : 'none';
+}
+
+// ---------------------------------------------------------------------------
+// Profile context menu (rename / duplicate)
+// ---------------------------------------------------------------------------
+let contextMenuProfileIdx = -1;
+
+function openProfileContextMenu(profileIdx, clientX, clientY) {
+  contextMenuProfileIdx = profileIdx;
+  const menu = $('profile-context-menu');
+
+  // Render off-screen to measure
+  menu.style.left = '-9999px';
+  menu.style.top = '0';
+  menu.classList.remove('hidden');
+  const r = menu.getBoundingClientRect();
+
+  // Position within viewport
+  let left = clientX;
+  let top = clientY;
+  if (left + r.width  > window.innerWidth  - 8) left = window.innerWidth  - r.width  - 8;
+  if (top  + r.height > window.innerHeight - 8) top  = window.innerHeight - r.height - 8;
+  if (left < 8) left = 8;
+  if (top  < 8) top  = 8;
+
+  menu.style.left = `${Math.round(left)}px`;
+  menu.style.top  = `${Math.round(top)}px`;
+}
+
+function closeProfileContextMenu() {
+  $('profile-context-menu').classList.add('hidden');
+  contextMenuProfileIdx = -1;
+}
+
+function startRenameProfile(idx) {
+  const item = document.querySelector(`.profile-item[data-idx="${idx}"]`);
+  if (!item) return;
+  const nameSpan = item.querySelector('.profile-item-name');
+  if (!nameSpan) return;
+  const profile = config.gameModeConfigs[idx];
+  if (!profile) return;
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'profile-item-name-input';
+  input.value = profile.name || '';
+  input.maxLength = 40;
+  input.spellcheck = false;
+
+  // Replace span with input
+  nameSpan.replaceWith(input);
+  // Defer focus to next tick so the contextmenu's click-outside handler doesn't immediately blur
+  setTimeout(() => { input.focus(); input.select(); }, 0);
+
+  let committed = false;
+  const finish = (save) => {
+    if (committed) return;
+    committed = true;
+    if (save) {
+      const newName = input.value.trim();
+      if (newName) profile.name = newName;
+    }
+    // Re-render fully — also updates the right-panel "name" input if this is the selected profile
+    renderProfileList();
+    if (idx === selectedProfileIdx) {
+      $('settings-profile-name').textContent = profile.name || 'Profile Settings';
+      $('set-name').value = profile.name || '';
+    }
+  };
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter')   { e.preventDefault(); finish(true); }
+    if (e.key === 'Escape')  { e.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+  input.addEventListener('click', e => e.stopPropagation());
+}
+
+function duplicateProfile(srcIdx) {
+  if (!config?.gameModeConfigs) return;
+  const src = config.gameModeConfigs[srcIdx];
+  if (!src) return;
+  if (config.gameModeConfigs.length >= 20) {
+    alert('Maximum of 20 profiles reached.');
+    return;
+  }
+  const copy = JSON.parse(JSON.stringify(src));
+  // Suffix " (copy)" — and avoid collisions for repeated duplicates.
+  const baseName = (src.name || 'Unnamed') + ' (copy)';
+  let name = baseName;
+  let n = 2;
+  const existing = new Set(config.gameModeConfigs.map(p => p.name));
+  while (existing.has(name)) name = `${baseName} ${n++}`;
+  copy.name = name;
+  // Insert directly after the source for a sensible visual position
+  config.gameModeConfigs.splice(srcIdx + 1, 0, copy);
+  selectedProfileIdx = srcIdx + 1;
+  selectedBtnId = null;
+  renderAll();
 }
 
 // ---------------------------------------------------------------------------
@@ -1511,8 +1739,9 @@ function renderSettingsPanel() {
   $('settings-profile-name').textContent = profile.name || 'Profile Settings';
   $('set-name').value = profile.name || '';
 
-  // Keyboard mode hides backends (DInput is forced) and Button Remapping
-  // (the firmware bypasses buttonRemapping in keyboard mode).
+  // Keyboard mode hides Backends (the mode-change handler forces DInput-only
+  // for the user) and Button Remapping (firmware bypasses it per
+  // CustomKeyboardMode.cpp).
   const keyboardMode = isKeyboardProfile(profile);
   $('backends-group').style.display = keyboardMode ? 'none' : '';
   $('remap-group').style.display    = keyboardMode ? 'none' : '';
@@ -2133,14 +2362,32 @@ function wireSettingsHandlers() {
     if (!p) return;
     const oldMode = p.modeId;
     const newMode = $('set-mode-id').value;
-    p.modeId = newMode;
-    // Keyboard mode is DInput-only by firmware design — force the backend
-    // list when switching in or restore USB defaults when switching out.
+    if (oldMode === newMode) return;
+
+    // Preserve every button's effective *output* across the mode change.
+    // For each button (whether bound explicitly or via the old mode's native
+    // default) we add a remap entry that points it at whichever button in the
+    // new mode natively produces the same output, so e.g. LF2 stays "L-Down"
+    // when going from Ultimate to FGC instead of becoming "D-Down".
+    preserveOutputsAcrossModeChange(p, oldMode, newMode);
+
+    // Keyboard-mode backend handling. Backends are hidden in keyboard mode, so
+    // the user can't manage them while in that state — reset them at the
+    // transition boundary instead:
+    //   * Entering keyboard mode: DInput only (the only backend that emits
+    //     HID keyboard reports).
+    //   * Leaving keyboard mode: restore the USB triplet so common gamepad
+    //     paths work out of the box; the user can then check/uncheck the
+    //     console backends to taste.
+    // (Non-keyboard ↔ non-keyboard transitions still leave backends alone.)
     if (newMode === 'MODE_KEYBOARD' && oldMode !== 'MODE_KEYBOARD') {
       p.applicableBackends = ['COMMS_BACKEND_DINPUT'];
     } else if (oldMode === 'MODE_KEYBOARD' && newMode !== 'MODE_KEYBOARD') {
       p.applicableBackends = [...USB_BACKENDS];
     }
+
+    p.modeId = newMode;
+    // applicableBackends / menuButtonIcon / rgbConfig stay untouched.
     renderProfileList();
     renderSettingsPanel();   // toggle backends/remap visibility
     buildControllerSVG();    // re-render with new mode's labels
@@ -2463,6 +2710,24 @@ function wireToolbarHandlers() {
     applyLiveButtonColor(selectedBtnId, 0);
   });
 
+  // Profile context-menu actions
+  $('profile-context-menu').addEventListener('click', (e) => {
+    const action = e.target?.dataset?.action;
+    if (!action) return;
+    e.stopPropagation();
+    const idx = contextMenuProfileIdx;
+    closeProfileContextMenu();
+    if (idx < 0) return;
+    if (action === 'rename')    startRenameProfile(idx);
+    if (action === 'duplicate') duplicateProfile(idx);
+  });
+
+  // Suppress the browser's native context menu inside the sidebar so our
+  // custom one takes precedence even on clicks not directly on a profile item.
+  $('profile-list').addEventListener('contextmenu', (e) => {
+    if (!e.target.closest('.profile-item')) e.preventDefault();
+  });
+
   // Close picker and/or popup on outside-click
   document.addEventListener('click', (e) => {
     const picker = $('hsl-picker');
@@ -2472,6 +2737,11 @@ function wireToolbarHandlers() {
         e.target.id !== 'set-rgb-color-swatch') {
       closeHsvPicker();
     }
+    // Close the profile context menu on any outside click
+    const ctx = $('profile-context-menu');
+    if (!ctx.classList.contains('hidden') && !ctx.contains(e.target)) {
+      closeProfileContextMenu();
+    }
     const popup = $('output-popup');
     if (popup.classList.contains('hidden')) return;
     if (popup.contains(e.target)) return;
@@ -2480,10 +2750,11 @@ function wireToolbarHandlers() {
     closeOutputPopup();
   });
 
-  // Close picker / popup on Escape
+  // Close picker / popup / context menu on Escape
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (!$('hsl-picker').classList.contains('hidden')) { closeHsvPicker(); return; }
+    if (!$('profile-context-menu').classList.contains('hidden')) { closeProfileContextMenu(); return; }
     if (!$('output-popup').classList.contains('hidden')) closeOutputPopup();
     else if (!$('help-overlay').classList.contains('hidden')) $('help-overlay').classList.add('hidden');
   });
