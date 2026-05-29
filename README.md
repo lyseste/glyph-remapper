@@ -37,11 +37,13 @@
 ### Run locally
 
 ```bash
-# from the project root
+# from the repo root (where index.html lives)
 npx serve -p 5500
 ```
 
 Then open <http://localhost:5500/>.
+
+Any static file server works — `python -m http.server 5500`, the VS Code "Live Server" extension, etc. The only constraint is that the origin needs to be `https://` or `http://localhost` for WebSerial to function.
 
 ### Connecting to the device
 
@@ -70,19 +72,15 @@ You can also work entirely offline using the **Config File** ⬇ / ⬆ buttons t
 
 ## Project layout
 
-The configurator itself is three files. Everything else in the repo is reference material.
+The whole configurator is three files. There is no build step.
 
 ```
-glyph-config/                                   ← repo root
-├── glyph-configurator/                         ← the app
-│   ├── index.html
-│   ├── styles.css
-│   └── app.js                                  ← all logic lives here
-├── FW-Glyph-configurator/                      ← Glyph firmware (read-only reference)
-├── GlyphUserProfiles.json                      ← the official Limit Labs default profile set
-├── HayBox-proto-main/                          ← reference copy of GregTurbo/HayBox-proto
-├── CLAUDE.md                                   ← orientation notes for AI assistants
-└── README.md                                   ← this file (inside glyph-configurator/)
+.
+├── index.html
+├── styles.css
+├── app.js                ← all logic lives here
+├── README.md             ← this file
+└── LICENSE
 ```
 
 `app.js` is structured top-to-bottom roughly like this:
@@ -98,8 +96,22 @@ glyph-config/                                   ← repo root
 9. SVG render loop (`buildControllerSVG`) + `renderButtonIcon` and glyph builders
 10. Popup logic (`openOutputPopup`, `applyOutput`, `unmapSelected`, key-capture, colour controls)
 11. Sidebar + settings panel rendering and event wiring
-12. `DEFAULT_CONFIG_JSON` — embedded "Load Defaults" payload, sourced from `GlyphUserProfiles.json`
+12. `DEFAULT_CONFIG_JSON` — embedded "Load Defaults" payload, mirrors the official Limit Labs default profile set
 13. `DOMContentLoaded` boot
+
+---
+
+## External references (not in this repo)
+
+This repo only contains the configurator. The firmware and protobuf schema live in their own projects — you don't need either to run the app, but you'll want them when adding new modes or backends:
+
+| What | Where | Why you'd need it |
+|------|-------|--------------------|
+| **Glyph firmware** | <https://github.com/LimitLabs/FW-Glyph> | Each mode file in `src/modes/` (e.g. `Ultimate.cpp`, `FgcMode.cpp`, `RivalsOfAether.cpp`) tells you exactly which physical button fires which output — the source of truth for `MODE_OUTPUT_MAP`. |
+| **Protobuf schema** | <https://github.com/GregTurbo/HayBox-proto> (Glyph uses commit `db4e2f6` of GregTurbo's fork) | Defines the `Config` message format we send to the device. The schema is embedded inline in `app.js` as `PROTO_DEF`; refer back to the canonical `.proto` whenever you add or rename fields. |
+| **HayBox** | <https://github.com/JonnyHaystack/HayBox> | The base controller-firmware framework the Glyph builds on, in case you want to understand how modes/backends/inputs are wired together at the framework level. |
+
+Throughout this README, line numbers like `Ultimate.cpp:24` refer to files in the firmware repo above.
 
 ---
 
@@ -142,7 +154,7 @@ The schema is embedded inline in `app.js` as the `PROTO_DEF` string. The host us
 
 ## Data model
 
-Everything mirrors the firmware's protobuf [`Config`](FW-Glyph-configurator/) message. Stored at runtime in the top-level JS variable `config`. The JSON shape is identical, so JSON exports / imports / device transfers are all the same structure.
+Everything mirrors the firmware's protobuf `Config` message (defined in [GregTurbo/HayBox-proto `config.proto`](https://github.com/GregTurbo/HayBox-proto)). Stored at runtime in the top-level JS variable `config`. The JSON shape is identical, so JSON exports / imports / device transfers are all the same structure.
 
 ```
 Config
@@ -304,7 +316,7 @@ Right-clicking a profile in the sidebar opens a small floating menu:
 
 ### Adding a new game mode
 
-1. **Read the firmware mode file** in `FW-Glyph-configurator/src/modes/` to figure out which physical button fires which output.
+1. **Read the firmware mode file** in [`FW-Glyph/src/modes/`](https://github.com/LimitLabs/FW-Glyph) (e.g. `Ultimate.cpp`, `FgcMode.cpp`) to figure out which physical button fires which output.
 2. **Add a `<MODE>_MAP` constant** in `app.js`, e.g.:
    ```js
    const NEW_MODE_MAP = {
@@ -370,4 +382,4 @@ Most of the app works fine without a Glyph plugged in — load defaults, edit, e
 
 ## License
 
-See `LICENSE` in the project root.
+See [`LICENSE`](LICENSE).
