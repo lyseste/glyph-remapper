@@ -29,6 +29,14 @@
 
 ## Quick start
 
+### Hosted version
+
+If you just want to use the app, an always-up-to-date build is hosted at:
+
+> **<https://lyseste.com/glyph-remapper/>**
+
+No install required — open it in a Chromium-based browser and skip to **[Connecting to the device](#connecting-to-the-device)** below.
+
 ### Requirements
 
 - A **Chromium-based browser** (Chrome, Edge, Brave, Arc) — WebSerial is not available in Firefox or Safari yet.
