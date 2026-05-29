@@ -38,7 +38,7 @@
 
 ```bash
 # from the project root
-npx serve -p 5500 glyph-configurator
+npx serve -p 5500
 ```
 
 Then open <http://localhost:5500/>.
