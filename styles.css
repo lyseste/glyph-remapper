@@ -86,7 +86,7 @@ html, body {
 
 .logo-text {
   font-family: 'Major Mono Display', 'Courier New', monospace;
-  font-size: 20px;
+  font-size: 26px;
   font-weight: 400;
   color: var(--text-bright);
   white-space: nowrap;
@@ -140,7 +140,10 @@ html, body {
 }
 
 .btn-icon {
-  padding: 7px 11px;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  justify-content: center;
   font-size: 16px;
 }
 
@@ -173,6 +176,54 @@ html, body {
   margin-right: 2px;
   letter-spacing: 0.02em;
 }
+
+/* ============================================================
+   Confirm popup (replaces native window.confirm)
+   ============================================================ */
+.confirm-popup {
+  position: absolute;
+  z-index: 1000;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 7px;
+  padding: 8px 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+.confirm-popup-msg {
+  white-space: nowrap;
+  text-align: center;
+}
+.confirm-popup-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+.confirm-popup-yes,
+.confirm-popup-no {
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-card);
+  font-size: 19px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.confirm-popup-yes { color: #4ade80; }
+.confirm-popup-yes:hover { background: #4ade80; border-color: #4ade80; color: #022c22; }
+.confirm-popup-no { color: #f87171; }
+.confirm-popup-no:hover { background: #f87171; border-color: #f87171; color: #2a0606; }
 
 /* ============================================================
    Status Bar
@@ -224,8 +275,8 @@ html, body {
    Sidebar
    ============================================================ */
 .sidebar {
-  width: 231px;
-  min-width: 187px;
+  width: 250px;
+  min-width: 200px;
   background: var(--bg-card);
   border-right: 1px solid var(--border);
   display: flex;
@@ -445,6 +496,13 @@ html, body {
   display: none;
 }
 
+/* Keyboard-mode hide: keep the bar's space reserved so the controller doesn't
+   shift down, but make it invisible and non-interactive. */
+.platform-bar.hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* Icon image inside popup output-glyph cells */
 .output-glyph-icon {
   width: 100%;
@@ -561,8 +619,8 @@ html, body {
    Settings panel
    ============================================================ */
 .settings-panel {
-  width: 275px;
-  min-width: 231px;
+  width: 300px;
+  min-width: 250px;
   background: var(--bg-card);
   border-left: 1px solid var(--border);
   display: flex;
@@ -666,7 +724,7 @@ html, body {
 .setting-select, .setting-input {
   width: 100%;
   padding: 8px 11px;
-  background: var(--bg-input);
+  background-color: var(--bg-input);
   border: 1px solid var(--border-light);
   border-radius: 6px;
   color: var(--text);
@@ -674,6 +732,21 @@ html, body {
   font-family: inherit;
   outline: none;
   transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+/* Strip the native chrome and pin our own dim chevron at the right edge so
+   the dropdown arrow matches the SOCD-row selects exactly. The native browser
+   arrow sits flush against the border (and varies by OS); the custom one is
+   inset by the same amount as the text padding. */
+.setting-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 9px 6px;
+  padding-right: 30px;
+  cursor: pointer;
 }
 
 .setting-select:focus, .setting-input:focus {
@@ -727,7 +800,17 @@ html, body {
 }
 
 .socd-item select, .remap-item select {
-  background: transparent;
+  /* Strip the native chrome so the text-overflow:ellipsis actually fires and
+     so we can pin our own arrow at the right edge — the native arrow sits
+     inside the content box and clipped text would otherwise slide under it. */
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: transparent;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 4px center;
+  background-size: 9px 6px;
+  padding-right: 16px;
   border: none;
   color: var(--text);
   font-family: 'Inconsolata', 'Consolas', monospace;
@@ -737,6 +820,20 @@ html, body {
   cursor: pointer;
   flex: 1;
   min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* In keyboard-mode SOCD rows the button selects can be narrow (3-4 char ids)
+   so they yield room to the SOCD-type select, which holds longer enum names. */
+.socd-item .socd-dir {
+  flex: 0 1 64px;
+}
+
+.socd-item .socd-type {
+  flex: 1 1 120px;
+  min-width: 90px;
 }
 
 .socd-item select option, .remap-item select option {
@@ -748,6 +845,18 @@ html, body {
   color: var(--text-dim);
   flex-shrink: 0;
   padding: 0 2px;
+}
+
+/* Axis label for the predefined SOCD rows (Left X / Left Y / Right X / Right Y).
+   Uses the same Inconsolata family as the manual-mode select for visual parity. */
+.socd-axis-label {
+  font-family: 'Inconsolata', 'Consolas', monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  flex-shrink: 0;
+  padding-left: 4px;
+  min-width: 60px;
 }
 
 .item-del-btn {
@@ -980,12 +1089,57 @@ html, body {
 
 .popup-keyboard-input:focus { outline: none; }
 
+/* "Assign Esc" sets the binding to Escape — needed because Escape during
+   capture is reserved for cancelling. */
+.popup-keyboard-esc {
+  padding: 7px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  align-self: center;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.popup-keyboard-esc:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-dim);
+  color: var(--text);
+}
+
 .output-popup-hint {
   font-size: 11px;
   color: var(--text-dim);
   line-height: 1.4;
   font-style: italic;
 }
+
+/* ============================================================
+   Custom hover tooltip (controller buttons)
+   Same shell style as the right-click context menu, monospace font.
+   ============================================================ */
+.btn-tooltip {
+  position: fixed;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-family: 'Inconsolata', 'Consolas', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  z-index: 95;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55), 0 4px 12px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+}
+
+.btn-tooltip.hidden { display: none; }
 
 /* ============================================================
    Custom right-click context menu (profile list)
@@ -1119,7 +1273,8 @@ html, body {
   border-color: var(--danger);
 }
 
-.popup-remove-lighting {
+.popup-remove-lighting,
+.popup-save-color {
   width: 34px;
   height: 34px;
   flex-shrink: 0;
@@ -1129,6 +1284,7 @@ html, body {
   color: var(--text-dim);
   cursor: pointer;
   font-size: 18px;
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1142,6 +1298,60 @@ html, body {
   border-color: var(--danger);
   background: var(--bg-hover);
 }
+
+/* Rainbow-mode per-button toggles inside the assign popup. The two buttons
+   replace the static color row when the profile's animation is rainbow:
+   rainbow-gradient = participate, ⊘ = LED off. Matches the static row's
+   separator (margin/padding/border-top) so the layout doesn't shift when the
+   user flips between animation modes. */
+.output-popup-rainbow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.output-popup-rainbow[hidden] { display: none; }
+.popup-rainbow-on,
+.popup-rainbow-off {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-light);
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 700;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: border-color 0.12s, box-shadow 0.12s, color 0.12s, background 0.12s;
+}
+.popup-rainbow-on {
+  background: linear-gradient(90deg,
+    #ff3b30 0%, #ff9500 17%, #ffcc00 33%, #34c759 50%,
+    #00b4d8 67%, #5e5ce6 83%, #ff2d92 100%);
+  color: transparent;   /* gradient is the entire visual */
+}
+.popup-rainbow-off {
+  background: var(--bg-card);
+  color: var(--text-dim);
+}
+.popup-rainbow-on:hover  { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.popup-rainbow-off:hover { color: var(--danger); border-color: var(--danger); background: var(--bg-hover); }
+.popup-rainbow-on.selected  { border-color: var(--text-bright); box-shadow: 0 0 0 2px var(--accent-soft); }
+.popup-rainbow-off.selected { color: var(--text-bright); border-color: var(--text-bright); }
+
+.popup-save-color:hover {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+  background: var(--bg-hover);
+}
+
+.popup-save-color { font-size: 20px; }
 
 .output-popup-unmap {
   width: 100%;
@@ -1165,11 +1375,78 @@ html, body {
 }
 
 /* Right-panel Button Lighting section */
-.rgb-static-controls {
+.rgb-static-controls,
+.rgb-rainbow-controls {
   margin-top: 8px;
   display: flex;
   flex-direction: column;
   gap: 7px;
+}
+/* Author `display: flex` outranks the UA `[hidden] { display: none }` rule,
+   so the HTML `hidden` attribute is otherwise ignored on these blocks. */
+.rgb-static-controls[hidden],
+.rgb-rainbow-controls[hidden] {
+  display: none;
+}
+
+/* Apply button sits between the value being applied and the saved-color
+   palette (static) or below the speed slider (rainbow). */
+.rgb-apply-btn { margin-top: 2px; }
+
+.rgb-speed-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rgb-speed-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  min-width: 42px;
+}
+.rgb-speed-slider {
+  flex: 1;
+  height: 22px;
+  background: transparent;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.rgb-speed-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  background: linear-gradient(90deg,
+    #ff3b30 0%, #ff9500 17%, #ffcc00 33%, #34c759 50%,
+    #00b4d8 67%, #5e5ce6 83%, #ff2d92 100%);
+  border-radius: 3px;
+}
+.rgb-speed-slider::-moz-range-track {
+  height: 4px;
+  background: linear-gradient(90deg,
+    #ff3b30 0%, #ff9500 17%, #ffcc00 33%, #34c759 50%,
+    #00b4d8 67%, #5e5ce6 83%, #ff2d92 100%);
+  border-radius: 3px;
+}
+.rgb-speed-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: var(--text-bright);
+  border: 2px solid var(--bg-card);
+  cursor: pointer;
+}
+.rgb-speed-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-bright);
+  border: 2px solid var(--bg-card);
+  cursor: pointer;
 }
 
 .rgb-color-row {
@@ -1203,6 +1480,65 @@ html, body {
 
 .rgb-color-hex.invalid {
   border-color: var(--danger);
+}
+
+/* "+" save-color button in the rgb-color-row */
+.rgb-save-color {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+
+.rgb-save-color:hover {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+  background: var(--bg-hover);
+}
+
+/* ============================================================
+   Saved colors palette
+   Used in both the right-panel Button Lighting and the assign popup.
+   Swatches match the size of the main color-picker swatch (32 px) — right
+   click a swatch for the Remove context menu (no hover-overlay to avoid
+   accidental deletes).
+   ============================================================ */
+.saved-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.saved-colors[hidden] { display: none; }
+
+.saved-color {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.1s, border-color 0.12s, box-shadow 0.12s;
+}
+
+.saved-color:hover {
+  transform: translateY(-1px) scale(1.04);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
 }
 
 /* ============================================================
@@ -1329,6 +1665,35 @@ html, body {
 .help-body li { margin-bottom: 4px; }
 
 .help-body p { margin-bottom: 6px; color: var(--text); }
+
+/* Help footer with the GitHub link */
+.help-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 18px 14px;
+  border-top: 1px solid var(--border);
+}
+
+.help-github {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: color 0.12s, background 0.12s;
+}
+
+.help-github:hover {
+  color: var(--text-bright);
+  background: var(--bg-hover);
+}
+
+.help-github svg { display: block; }
 
 /* ============================================================
    HSV Color Picker

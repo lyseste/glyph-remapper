@@ -93,7 +93,7 @@ const BUTTON_LAYOUT = [
   { id: 'BTN_RT1',  x: 636.22, y: 323.64, r: 29.30, label: 'RT1' },
   { id: 'BTN_RT2',  x: 582.82, y: 360.11, r: 29.30, label: 'RT2' },
   // Menu buttons — top-left corner, in a row. Larger (r=13) than the layout SVG
-  // mockup so the assigned icon is readable; centres spaced 29 units apart so
+  // mockup so the assigned icon is readable; centers spaced 29 units apart so
   // the row only grows slightly wider than before.
   { id: 'BTN_MB1', x:  60, y: 25, r: 13, label: 'MB1', menu: true },
   { id: 'BTN_MB2', x:  89, y: 25, r: 13, label: 'MB2', menu: true },
@@ -197,24 +197,54 @@ const MELEE_MAP = {
 };
 
 // ProjectM adds RF9 as light shield (triggerRAnalog=49) on top of PFM.
+// Brawl / Project M: same as PFM. RF9 in firmware (ProjectM.cpp:47) is
+// commented out, so no light-shield assignment — leave the map untouched.
 const PROJECT_M_MAP = {
   ...PLATFORM_FIGHTER_MAP,
-  BTN_RF9: 'rt_light',
 };
 
-// Rivals of Aether: same as PFM but RF9 fires the XInput LB bumper.
-// Source: src/modes/RivalsOfAether.cpp:62 — outputs.buttonL = inputs.rf9;
-// (the GameCube backend silently discards buttonL, so LB only effectively
-// triggers when the XInput / DInput / Switch backend is active.)
+// Rivals of Aether: Melee-style D-pad (LT6/LF7/LF8/LF6) and RF7/RF8 are stick
+// clicks — NOT the PFM dpad. RF9 fires LB.
+// Source: src/modes/RivalsOfAether.cpp:29-30 (rf7=ls, rf8=rs),
+//         lines 44-47 (lt6/lf7/lf8/lf6 dpad), line 62 (rf9=buttonL).
 const ROA_MAP = {
-  ...PLATFORM_FIGHTER_MAP,
+  // Face buttons (same as PFM)
+  BTN_RT1: 'a', BTN_RF1: 'b', BTN_RF2: 'x', BTN_RF6: 'y',
+  // Shoulders
+  BTN_RF3: 'rb', BTN_LF4: 'lt', BTN_RF5: 'rt',
+  // D-Pad (Melee-style: LT6=up, LF7=down, LF8=left, LF6=right)
+  BTN_LT6: 'dup', BTN_LF7: 'ddown', BTN_LF8: 'dleft', BTN_LF6: 'dright',
+  // Stick clicks (RoA-specific: RF7=L3, RF8=R3 — NOT dpad like PFM)
+  BTN_RF7: 'ls', BTN_RF8: 'rs',
+  // Left-stick directions
+  BTN_LF3: 'lsl', BTN_LF1: 'lsr', BTN_LF2: 'lsd', BTN_RF4: 'lsu',
+  // C-stick (right stick) directions
+  BTN_RT3: 'csl', BTN_RT5: 'csr', BTN_RT2: 'csd', BTN_RT4: 'csu',
+  // Modifiers
+  BTN_LT1: 'mx', BTN_LT2: 'my',
+  // RoA-specific: RF9 = LB
   BTN_RF9: 'lb',
 };
 
-// Rivals 2: same as PFM but LT5 fires the XInput LB bumper.
-// Source: src/modes/Rivals2.cpp:28 — outputs.buttonL = inputs.lt5;
+// Rivals 2: same D-pad / stick-click layout as RoA, but LT5 fires LB.
+// Source: src/modes/Rivals2.cpp:28 (lt5=buttonL),
+//         lines 56-59 (lt6/lf7/lf8/lf6 dpad), lines 74-75 (rf7=ls, rf8=rs).
 const ROA2_MAP = {
-  ...PLATFORM_FIGHTER_MAP,
+  // Face buttons
+  BTN_RT1: 'a', BTN_RF1: 'b', BTN_RF2: 'x', BTN_RF6: 'y',
+  // Shoulders
+  BTN_RF3: 'rb', BTN_LF4: 'lt', BTN_RF5: 'rt',
+  // D-Pad (Melee-style)
+  BTN_LT6: 'dup', BTN_LF7: 'ddown', BTN_LF8: 'dleft', BTN_LF6: 'dright',
+  // Stick clicks
+  BTN_RF7: 'ls', BTN_RF8: 'rs',
+  // Left-stick directions
+  BTN_LF3: 'lsl', BTN_LF1: 'lsr', BTN_LF2: 'lsd', BTN_RF4: 'lsu',
+  // C-stick (right stick) directions
+  BTN_RT3: 'csl', BTN_RT5: 'csr', BTN_RT2: 'csd', BTN_RT4: 'csu',
+  // Modifiers
+  BTN_LT1: 'mx', BTN_LT2: 'my',
+  // RoA2-specific: LT5 = LB
   BTN_LT5: 'lb',
 };
 
@@ -442,7 +472,7 @@ const SWITCH_STYLE = {
   rt_light: mkShoulder('Lt'), rt_mid: mkShoulder('Md'),
 };
 
-// GameCube: A/B/X/Y use GC colours; Z maps to rb; L/R are lt/rt; no lb.
+// GameCube: A/B/X/Y use GC colors; Z maps to rb; L/R are lt/rt; no lb.
 const GC_STYLE = {
   a: mkFace('A', '#3cb34a'),
   b: mkFace('B', '#e03030'),
@@ -1087,7 +1117,7 @@ function isKeyboardProfile(profile) {
 }
 
 // MB1 is the hardware "open device menu" button — never remappable, but it has
-// an addressable LED so its color can still be customised.
+// an addressable LED so its color can still be customized.
 const NON_REMAPPABLE_BUTTONS = new Set(['BTN_MB1']);
 
 // MB2-MB7 are mapped to gamepad outputs but have NO physical LED on the device,
@@ -1105,6 +1135,31 @@ const RGB_ANIMATIONS = [
   { value: 'RGB_ANIM_RAINBOW_SHIFT',       label: 'Rainbow Shift' },
   { value: 'RGB_ANIM_UNSPECIFIED',         label: 'None' },
 ];
+
+// Per-profile rainbow modes — animation, hue offset and speed are global to
+// the RgbConfig, while per-button "participation" is encoded by the button's
+// stored color: firmware treats color >= 0xFFFFFF as "rotate through hues",
+// anything else as "LED off" during the animation (NeoPixelBackend.hpp).
+const RAINBOW_ANIMATIONS = new Set([
+  'RGB_ANIM_RAINBOW_XWAVE_LEFT',
+  'RGB_ANIM_RAINBOW_SHIFT',
+]);
+// Five speed steps for the slider. The firmware computes
+// deltaHue = elapsed_ms × 0.08 × speed each frame, so these values map roughly
+// to "barely moving" → "very fast".
+const RAINBOW_SPEED_STEPS = [1, 2, 4, 7, 12];
+const DEFAULT_RAINBOW_SPEED = RAINBOW_SPEED_STEPS[2];   // step index 2 (middle)
+// Sentinel value stored in buttonColors[].color to mark a button as
+// "participating in the active rainbow animation". The firmware checks for
+// color >= 0xFFFFFF; we use exactly 0xFFFFFF.
+const RAINBOW_PARTICIPATING_COLOR = 0xFFFFFF;
+
+function isRainbowAnim(animOrProfile) {
+  if (!animOrProfile) return false;
+  if (typeof animOrProfile === 'string') return RAINBOW_ANIMATIONS.has(animOrProfile);
+  const rgb = getRgbConfig(animOrProfile);
+  return RAINBOW_ANIMATIONS.has(rgb?.animation);
+}
 
 function colorIntToHex(c) {
   return '#' + (Number(c) >>> 0).toString(16).padStart(6, '0').slice(-6);
@@ -1139,6 +1194,123 @@ function hsvToRgbInt(h, s, v) {
     return v - v * s * Math.max(0, Math.min(k, 4 - k, 1));
   };
   return (Math.round(f(5) * 255) << 16) | (Math.round(f(3) * 255) << 8) | Math.round(f(1) * 255);
+}
+
+// ---------------------------------------------------------------------------
+// Saved-colors palette
+// User-managed list of quick-pick LED colors, persisted to localStorage.
+// Used by both the assign popup and the right-panel Button Lighting section.
+// ---------------------------------------------------------------------------
+const SAVED_COLORS_KEY = 'glyph-remapper:savedColors';
+const SAVED_COLORS_MAX = 24;
+let savedColors = [];
+
+function loadSavedColorsFromStorage() {
+  try {
+    const raw = localStorage.getItem(SAVED_COLORS_KEY);
+    if (!raw) return;
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr)) {
+      savedColors = arr
+        .filter(c => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c))
+        .map(c => c.toLowerCase())
+        .slice(0, SAVED_COLORS_MAX);
+    }
+  } catch { /* corrupt entry — ignore */ }
+}
+
+function persistSavedColors() {
+  try { localStorage.setItem(SAVED_COLORS_KEY, JSON.stringify(savedColors)); } catch {}
+}
+
+function addSavedColor(hexLike) {
+  const colorInt = parseHexInput(hexLike);
+  if (colorInt == null) return false;
+  const hex = colorIntToHex(colorInt);
+  if (savedColors.includes(hex)) return false;
+  savedColors.push(hex);
+  if (savedColors.length > SAVED_COLORS_MAX) savedColors.shift();
+  persistSavedColors();
+  renderAllSavedColorPalettes();
+  return true;
+}
+
+function removeSavedColor(hex) {
+  const idx = savedColors.indexOf(hex);
+  if (idx < 0) return;
+  savedColors.splice(idx, 1);
+  persistSavedColors();
+  renderAllSavedColorPalettes();
+}
+
+// Render one palette container. `onPick(hex)` is invoked when a swatch is
+// left-clicked. Right-clicking a swatch opens a small context menu with a
+// Remove option — no hover overlay, so it's harder to delete by accident.
+function renderSavedColorPalette(container, onPick) {
+  if (!container) return;
+  container.innerHTML = '';
+  if (!savedColors.length) { container.hidden = true; return; }
+  container.hidden = false;
+  for (const hex of savedColors) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'saved-color';
+    btn.style.background = hex;
+    btn.title = `${hex} — right-click to remove`;
+    btn.addEventListener('click', () => onPick(hex));
+    btn.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openSavedColorMenu(hex, e.clientX, e.clientY);
+    });
+    container.appendChild(btn);
+  }
+}
+
+// Saved-color context menu (rename'esque pattern from the profile menu).
+let savedColorMenuTarget = null;
+
+function openSavedColorMenu(hex, clientX, clientY) {
+  savedColorMenuTarget = hex;
+  const menu = $('saved-color-menu');
+  menu.style.left = '-9999px';
+  menu.style.top = '0';
+  menu.classList.remove('hidden');
+  const r = menu.getBoundingClientRect();
+  let left = clientX, top = clientY;
+  if (left + r.width  > window.innerWidth  - 8) left = window.innerWidth  - r.width  - 8;
+  if (top  + r.height > window.innerHeight - 8) top  = window.innerHeight - r.height - 8;
+  if (left < 8) left = 8;
+  if (top  < 8) top  = 8;
+  menu.style.left = `${Math.round(left)}px`;
+  menu.style.top  = `${Math.round(top)}px`;
+}
+
+function closeSavedColorMenu() {
+  $('saved-color-menu').classList.add('hidden');
+  savedColorMenuTarget = null;
+}
+
+function renderAllSavedColorPalettes() {
+  // Right panel: clicking a swatch loads it into the hex input + main swatch.
+  renderSavedColorPalette($('panel-saved-colors'), (hex) => {
+    $('set-rgb-color-hex').value = hex;
+    $('set-rgb-color-hex').classList.remove('invalid');
+    $('set-rgb-color-swatch').style.background = hex;
+  });
+  // Popup: clicking a swatch applies the color to the currently-selected
+  // button (lives the popup-color-controls).
+  renderSavedColorPalette($('popup-saved-colors'), (hex) => {
+    const profile = currentProfile();
+    if (!profile || !selectedBtnId) return;
+    const colorInt = parseHexInput(hex);
+    if (colorInt == null) return;
+    setButtonColor(profile, selectedBtnId, colorInt);
+    $('popup-color-swatch').style.background = hex;
+    $('popup-color-hex').value = hex;
+    $('popup-color-hex').classList.remove('invalid');
+    applyLiveButtonColor(selectedBtnId, colorInt);
+  });
 }
 
 // Get (or lazily create) the RgbConfig object for this profile.
@@ -1344,6 +1516,22 @@ function buildControllerSVG() {
   const s = svg();
   s.innerHTML = '';
 
+  // Defs: a rainbow gradient used to stroke the rings of buttons that are
+  // currently participating in a per-profile rainbow animation. Each button's
+  // ring is a small circle inside the 912×491 viewBox, so we use the default
+  // gradient bounding-box (each circle gets its own copy of the spectrum).
+  const defs = svgEl('defs');
+  const grad = svgEl('linearGradient', { id: 'rainbow-grad', x1: '0%', y1: '0%', x2: '100%', y2: '0%' });
+  for (const [offset, color] of [
+    ['0%',   '#ff3b30'], ['17%',  '#ff9500'], ['33%',  '#ffcc00'],
+    ['50%',  '#34c759'], ['67%',  '#00b4d8'], ['83%',  '#5e5ce6'],
+    ['100%', '#ff2d92'],
+  ]) {
+    grad.appendChild(svgEl('stop', { offset, 'stop-color': color }));
+  }
+  defs.appendChild(grad);
+  s.appendChild(defs);
+
   // Controller body — fills the viewBox (912 x 491, rx=19)
   const body = svgEl('rect', { x:0, y:0, width:912, height:491, rx:19, ry:19, class:'controller-body' });
   s.appendChild(body);
@@ -1354,6 +1542,7 @@ function buildControllerSVG() {
   const platformStyle = PLATFORM_STYLES[selectedPlatform] || XBOX_STYLE;
 
   const keyboardMode = isKeyboardProfile(profile);
+  const rainbowMode = isRainbowAnim(profile);
 
   for (const btn of BUTTON_LAYOUT) {
     let style = null;
@@ -1383,18 +1572,36 @@ function buildControllerSVG() {
     classes.push(showRing ? 'mapped' : 'unmapped');
     if (btn.id === selectedBtnId) classes.push('selected');
 
+    // Hover tooltip: "LF2 (L-Down)" for mapped buttons, "LF2" otherwise.
+    // Rendered by a custom #btn-tooltip element via delegated mouse listeners
+    // — see wireToolbarHandlers() — so we can style it consistently with the
+    // rest of the app instead of relying on the native browser tooltip.
+    const shortName = btn.id.replace('BTN_', '');
+    const tooltipText = style
+      ? `${shortName} (${tooltipOutputLabel(style, keyboardMode)})`
+      : shortName;
+
     const g = svgEl('g', {
       class: classes.join(' '),
       'data-btn': btn.id,
+      'data-tooltip': tooltipText,
       role: 'button',
       tabindex: '0',
-      'aria-label': btn.id + (style ? ' → ' + style.label : '')
+      'aria-label': tooltipText,
     });
 
     // Outer ring (color comes from the --led-color custom property below)
     g.appendChild(svgEl('circle', { cx: btn.x, cy: btn.y, r: btn.r, class: 'btn-ring' }));
     if (showRing && hasLED(btn.id)) {
-      g.style.setProperty('--led-color', colorIntToHex(getButtonColor(profile, btn.id)));
+      const stored = getButtonColor(profile, btn.id);
+      // Rainbow modes: a button "participates" only if its stored color is
+      // 0xFFFFFF. Indicate this with the shared rainbow-grad stroke.
+      if (rainbowMode && stored >= RAINBOW_PARTICIPATING_COLOR) {
+        g.style.setProperty('--led-color', 'url(#rainbow-grad)');
+        g.classList.add('btn-rainbow');
+      } else {
+        g.style.setProperty('--led-color', colorIntToHex(stored));
+      }
     }
 
     // Base fill (dark background inside ring, or solid dark fill if unmapped)
@@ -1416,7 +1623,7 @@ function renderButtonIcon(g, btn, style) {
   // Use a Kenney SVG icon when one is available for this platform + output.
   const iconPath = getIconPath(selectedPlatform, style._outputId);
   if (iconPath) {
-    // Dark background disk — keeps the same base colour as unmapped/text buttons.
+    // Dark background disk — keeps the same base color as unmapped/text buttons.
     g.appendChild(svgEl('circle', {
       cx: btn.x, cy: btn.y, r: btn.r - 0.6,
       class: 'btn-icon-disk',
@@ -1615,7 +1822,7 @@ function renderProfileList() {
     });
     item.querySelector('.profile-item-del').addEventListener('click', e => {
       e.stopPropagation();
-      if (confirm(`Delete profile "${p.name || 'Unnamed'}"?`)) deleteProfile(i);
+      confirmNearAnchor(e.currentTarget, `Delete "${p.name || 'Unnamed'}"?`, () => deleteProfile(i));
     });
     item.addEventListener('contextmenu', e => {
       e.preventDefault();
@@ -1812,33 +2019,190 @@ function renderRgbSection(profile) {
   const anim = rgb?.animation || 'RGB_ANIM_STATIC';
   animSelect.value = anim;
 
-  const defaultColor = rgb?.defaultColor != null ? Number(rgb.defaultColor) >>> 0 : DEFAULT_LED_COLOR_INT;
-  const hex = colorIntToHex(defaultColor);
-  $('set-rgb-color-swatch').style.background = hex;
-  $('set-rgb-color-hex').value = hex;
-  $('set-rgb-color-hex').classList.remove('invalid');
+  const isStatic  = (anim === 'RGB_ANIM_STATIC');
+  const isRainbow = RAINBOW_ANIMATIONS.has(anim);
 
-  $('rgb-static-controls').hidden = (anim !== 'RGB_ANIM_STATIC');
+  // Static: color swatch + hex + saved palette. Rainbow: speed slider.
+  // Each block has its own "Apply to mapped buttons" so the button can sit in
+  // the place that makes sense for the mode (just below the value being
+  // applied).
+  $('rgb-static-controls').hidden  = !isStatic;
+  $('rgb-rainbow-controls').hidden = !isRainbow;
+
+  if (isStatic) {
+    const defaultColor = rgb?.defaultColor != null ? Number(rgb.defaultColor) >>> 0 : DEFAULT_LED_COLOR_INT;
+    const hex = colorIntToHex(defaultColor);
+    $('set-rgb-color-swatch').style.background = hex;
+    $('set-rgb-color-hex').value = hex;
+    $('set-rgb-color-hex').classList.remove('invalid');
+  }
+  if (isRainbow) {
+    // Closest slider step for the current speed; fall back to the middle step.
+    const speed = Number(rgb?.speed) || DEFAULT_RAINBOW_SPEED;
+    let step = RAINBOW_SPEED_STEPS.indexOf(speed);
+    if (step < 0) {
+      step = RAINBOW_SPEED_STEPS.reduce(
+        (best, v, i) => Math.abs(v - speed) < Math.abs(RAINBOW_SPEED_STEPS[best] - speed) ? i : best,
+        2
+      );
+    }
+    $('set-rgb-speed').value = String(step);
+  }
+
+  renderAllSavedColorPalettes();
 }
+
+// Fixed stick / d-pad axes for the controller-mode SOCD UI. The D-pad is
+// surfaced as its own pair of axes (separate from the analog stick) so the
+// user can set independent SOCD rules — matching the official configurator.
+// Each axis is only rendered when the current profile actually has buttons
+// producing those outputs (axisButtonPairs filters them out otherwise).
+const SOCD_AXES = [
+  { id: 'left-x',  label: 'Left X',  outputPairs: [['lsl', 'lsr']] },
+  { id: 'left-y',  label: 'Left Y',  outputPairs: [['lsu', 'lsd']] },
+  { id: 'dpad-x',  label: 'D-Pad X', outputPairs: [['dleft', 'dright']] },
+  { id: 'dpad-y',  label: 'D-Pad Y', outputPairs: [['dup',   'ddown']] },
+  { id: 'right-x', label: 'Right X', outputPairs: [['csl', 'csr']] },
+  { id: 'right-y', label: 'Right Y', outputPairs: [['csu', 'csd']] },
+];
+
+// Returns map outputId → [btnIds] producing that output in this profile,
+// accounting for the active mode + remappings. Used to look up which physical
+// buttons map to e.g. lsl, dright, csu, etc.
+function buttonsByOutput(profile) {
+  const out = {};
+  const rmap = remapMap(profile);
+  for (const btn of BUTTON_LAYOUT) {
+    if (btn.id.startsWith('BTN_MB')) continue;
+    const o = resolveButtonOutput(btn.id, profile, rmap);
+    if (!o) continue;
+    if (!out[o]) out[o] = [];
+    out[o].push(btn.id);
+  }
+  return out;
+}
+
+// For an axis, list the physical-button pairs that should be SOCD-resolved.
+// e.g. Left-X in Ultimate → [[LF3, LF1], [LF8, LF6]] (L-stick + D-pad).
+function axisButtonPairs(profile, axis) {
+  const byOut = buttonsByOutput(profile);
+  const rmap = remapMap(profile);
+  const pairs = [];
+  for (const [outA, outB] of axis.outputPairs) {
+    const aBtns = byOut[outA] || [];
+    const bBtns = byOut[outB] || [];
+    if (!aBtns.length || !bBtns.length) continue;
+    // SOCD is resolved post-remap by firmware (HandleRemap → HandleSocd), so
+    // socdPairs entries reference the *logical* (post-remap) button. Resolve
+    // each canonical physical button through the remap so lookups match what
+    // the firmware sees — e.g. a profile that remaps LF8→LF3 stores its SOCD
+    // entry as LF3+LF1, not LF8+LF6.
+    const aLogical = resolveLogicalButton(aBtns[0], rmap) || aBtns[0];
+    const bLogical = resolveLogicalButton(bBtns[0], rmap) || bBtns[0];
+    pairs.push([aLogical, bLogical]);
+  }
+  return pairs;
+}
+
+// Order-insensitive lookup of an existing SocdPair entry for two physical buttons.
+function findSocdPair(profile, btnA, btnB) {
+  if (!Array.isArray(profile.socdPairs)) return null;
+  return profile.socdPairs.find(p =>
+    (p.buttonDir1 === btnA && p.buttonDir2 === btnB) ||
+    (p.buttonDir1 === btnB && p.buttonDir2 === btnA)
+  ) || null;
+}
+
+function upsertSocdPair(profile, btnA, btnB, socdType) {
+  if (!Array.isArray(profile.socdPairs)) profile.socdPairs = [];
+  const existing = findSocdPair(profile, btnA, btnB);
+  if (existing) existing.socdType = socdType;
+  else profile.socdPairs.push({ buttonDir1: btnA, buttonDir2: btnB, socdType });
+}
+
+function removeSocdPair(profile, btnA, btnB) {
+  if (!Array.isArray(profile.socdPairs)) return;
+  profile.socdPairs = profile.socdPairs.filter(p => !(
+    (p.buttonDir1 === btnA && p.buttonDir2 === btnB) ||
+    (p.buttonDir1 === btnB && p.buttonDir2 === btnA)
+  ));
+}
+
+// "NONE" is a UI-only sentinel that means "no socdPairs entry for this axis".
+// Selecting it removes any existing entry; selecting any real SOCD_* type
+// creates or updates one. This matches the official configurator's behavior
+// and the firmware semantics (a missing pair = no SOCD rule, distinct from
+// SOCD_NEUTRAL which is an explicit cancel-both rule).
+const SOCD_NONE = 'NONE';
 
 function renderSocdList(profile) {
   const list = $('socd-list');
   list.innerHTML = '';
-  for (let i = 0; i < (profile.socdPairs?.length ?? 0); i++) {
-    const pair = profile.socdPairs[i];
-    list.appendChild(buildSocdRow(pair, i, profile));
+  const addBtn = $('btn-add-socd');
+
+  if (isKeyboardProfile(profile)) {
+    // Keyboard mode keeps the manual editor — there is no canonical stick/d-pad
+    // axis to drive predefined pairs.
+    addBtn.style.display = '';
+    for (let i = 0; i < (profile.socdPairs?.length ?? 0); i++) {
+      list.appendChild(buildSocdRow(profile.socdPairs[i], i, profile));
+    }
+    return;
+  }
+
+  // Controller modes — show one row per axis (Left X / Left Y / D-Pad X /
+  // D-Pad Y / Right X / Right Y). Each axis is only rendered when the profile
+  // actually has buttons producing those outputs. Axes with no existing
+  // socdPairs entry display the "None" option — the user can explicitly opt
+  // into a SOCD rule by picking any of the SOCD_* modes from the dropdown.
+  addBtn.style.display = 'none';
+  for (const axis of SOCD_AXES) {
+    const pairs = axisButtonPairs(profile, axis);
+    if (!pairs.length) continue;     // axis has no buttons in this mode — hide
+    list.appendChild(buildSocdAxisRow(axis, pairs, profile));
   }
 }
 
+function buildSocdAxisRow(axis, pairs, profile) {
+  const row = document.createElement('div');
+  row.className = 'socd-item socd-axis-item';
+  // Current type comes from the first existing pair. If no pair exists, the
+  // axis is in the "None" state (no SOCD rule will be sent to the device).
+  let currentType = SOCD_NONE;
+  for (const [a, b] of pairs) {
+    const ex = findSocdPair(profile, a, b);
+    if (ex?.socdType) { currentType = ex.socdType; break; }
+  }
+  const options = [
+    `<option value="${SOCD_NONE}"${currentType === SOCD_NONE ? ' selected' : ''}>NONE</option>`,
+    ...SOCD_TYPES.map(t => `<option value="${t}"${t === currentType ? ' selected' : ''}>${t.replace('SOCD_','')}</option>`),
+  ].join('');
+  row.innerHTML = `
+    <span class="socd-axis-label">${escHtml(axis.label)}</span>
+    <span class="socd-sep">:</span>
+    <select title="SOCD type for ${escHtml(axis.label)}">${options}</select>
+  `;
+  const select = row.querySelector('select');
+  select.addEventListener('change', () => {
+    if (select.value === SOCD_NONE) {
+      for (const [a, b] of pairs) removeSocdPair(profile, a, b);
+    } else {
+      for (const [a, b] of pairs) upsertSocdPair(profile, a, b, select.value);
+    }
+  });
+  return row;
+}
+
+// Keyboard-mode SOCD row — manual pair selection (kept from the previous UI).
 function buildSocdRow(pair, idx, profile) {
   const row = document.createElement('div');
   row.className = 'socd-item';
   row.innerHTML = `
-    <select title="Dir 1">${ALL_BUTTONS.map(b => `<option value="${b}"${b===pair.buttonDir1?' selected':''}>${b.replace('BTN_','')}</option>`).join('')}</select>
+    <select class="socd-dir" title="Dir 1">${ALL_BUTTONS.map(b => `<option value="${b}"${b===pair.buttonDir1?' selected':''}>${b.replace('BTN_','')}</option>`).join('')}</select>
     <span class="socd-sep">↔</span>
-    <select title="Dir 2">${ALL_BUTTONS.map(b => `<option value="${b}"${b===pair.buttonDir2?' selected':''}>${b.replace('BTN_','')}</option>`).join('')}</select>
+    <select class="socd-dir" title="Dir 2">${ALL_BUTTONS.map(b => `<option value="${b}"${b===pair.buttonDir2?' selected':''}>${b.replace('BTN_','')}</option>`).join('')}</select>
     <span class="socd-sep">:</span>
-    <select title="SOCD type">${SOCD_TYPES.map(t => `<option value="${t}"${t===pair.socdType?' selected':''}>${t.replace('SOCD_','')}</option>`).join('')}</select>
+    <select class="socd-type" title="SOCD type">${SOCD_TYPES.map(t => `<option value="${t}"${t===pair.socdType?' selected':''}>${t.replace('SOCD_','')}</option>`).join('')}</select>
     <button class="item-del-btn" title="Remove">✕</button>
   `;
   const [s1, s2, s3] = row.querySelectorAll('select');
@@ -1914,10 +2278,24 @@ function outputDropdownLabel(outputId) {
     lsu: 'L-Up',  lsd: 'L-Down',  lsl: 'L-Left',  lsr: 'L-Right',
     csu: 'C-Up',  csd: 'C-Down',  csl: 'C-Left',  csr: 'C-Right',
     rt_light: 'Lt-Shield', rt_mid: 'Mid-Shield',
+    // System buttons get word labels — the platform-styled glyphs (◉, ⌂, +)
+    // aren't readable in a tooltip.
+    home: 'Home', capture: 'Capture', start: 'Start', select: 'Back/Select',
+    ls: 'L-Stick Click', rs: 'R-Stick Click',
+    mx: 'Mod X', my: 'Mod Y',
   };
   if (FIXED[outputId]) return FIXED[outputId];
   const style = (PLATFORM_STYLES[selectedPlatform] || XBOX_STYLE)[outputId];
   return style?.label || outputId;
+}
+
+// Tooltip label for a controller button. In keyboard mode we already have a
+// HID-key label in style.label; for everything else we route through
+// outputDropdownLabel() so "lsd" → "L-Down" rather than printing the raw id.
+function tooltipOutputLabel(style, keyboardMode) {
+  if (keyboardMode) return style.label;
+  if (style._outputId) return outputDropdownLabel(style._outputId);
+  return style.label || '';
 }
 
 // Simple view: built from the effective mapping (physBtn + resolved outputId).
@@ -2080,13 +2458,21 @@ function openOutputPopup(btnId, _evt) {
   const hasLed = hasLED(btnId);
   const keyboardMode = isKeyboardProfile(profile);
 
+  const rainbowMode = isRainbowAnim(profile);
+
   // Toggle popup sections.
   //  - keyboard mode: hide output grid, show key-capture box, hide un-map for non-remappable buttons
   //  - controller mode: hide key-capture box, show output grid for remappable buttons
+  //  - rainbow animation: hide the color row + saved palette (the global hue
+  //    shifts hue for every button; per-button color just toggles participation)
+  //    and show a two-button row instead — rainbow-gradient = participate,
+  //    ⊘ = LED off during the animation.
   $('output-popup-grid').style.display     = (!keyboardMode && remappable) ? '' : 'none';
   $('output-popup-keyboard').style.display = (keyboardMode && remappable)  ? '' : 'none';
   $('output-popup-unmap').style.display    = remappable ? '' : 'none';
-  $('output-popup-color').style.display    = hasLed     ? '' : 'none';
+  $('output-popup-color').style.display    = (hasLed && !rainbowMode) ? '' : 'none';
+  $('output-popup-rainbow').hidden         = !(hasLed && rainbowMode);
+  $('popup-saved-colors').hidden           = !hasLed || rainbowMode || savedColors.length === 0;
 
   if (!keyboardMode) {
     const grid = $('output-popup-grid');
@@ -2107,7 +2493,12 @@ function openOutputPopup(btnId, _evt) {
     syncPopupKeyboardInput(btnId);
   }
 
-  if (hasLed) syncPopupColorControls(btnId);
+  if (hasLed && !rainbowMode) {
+    syncPopupColorControls(btnId);
+    renderAllSavedColorPalettes();
+  } else if (hasLed && rainbowMode) {
+    syncPopupRainbowControls(btnId);
+  }
 
   positionOutputPopup(btnId);
   $('output-popup').classList.remove('hidden');
@@ -2128,6 +2519,18 @@ function syncPopupColorControls(btnId) {
   $('popup-color-swatch').style.background = hex;
   $('popup-color-hex').value = hex;
   $('popup-color-hex').classList.remove('invalid');
+}
+
+// Rainbow popup mode: highlight whichever of the two toggle buttons matches
+// the stored color for this button (participate = 0xFFFFFF, off = anything
+// less). The matching button gets `.selected` so the user can see the state.
+function syncPopupRainbowControls(btnId) {
+  const profile = currentProfile();
+  if (!profile) return;
+  const stored = getButtonColor(profile, btnId);
+  const participating = stored >= RAINBOW_PARTICIPATING_COLOR;
+  $('popup-rainbow-on').classList.toggle('selected', participating);
+  $('popup-rainbow-off').classList.toggle('selected', !participating);
 }
 
 function positionOutputPopup(btnId) {
@@ -2321,6 +2724,10 @@ function updateGcTab() {
   const profile = currentProfile();
   const gcTab = document.querySelector('.platform-tab[data-platform="gamecube"]');
   if (!gcTab) return;
+  // Keyboard mode doesn't emit gamepad outputs, so the platform display style
+  // (Xbox/PS/Switch/GameCube) doesn't apply — hide the whole bar.
+  const platformBar = document.querySelector('.platform-bar');
+  if (platformBar) platformBar.classList.toggle('hidden', isKeyboardProfile(profile));
   const gcEnabled = profile?.applicableBackends?.includes('COMMS_BACKEND_GAMECUBE') ?? false;
   gcTab.classList.toggle('hidden', !gcEnabled);
   if (gcEnabled && selectedPlatform !== 'gamecube') {
@@ -2403,13 +2810,29 @@ function wireSettingsHandlers() {
     body.hidden = expanded;  // hide when previously expanded
   });
 
-  // RGB animation dropdown
+  // RGB animation dropdown. Switching to a rainbow animation does NOT auto-mark
+  // every button as participating — the user has to click "Apply to mapped
+  // buttons" for that (so they can preview the speed/etc. first). Switching
+  // away from rainbow leaves the per-button colors as-is.
   $('set-rgb-animation').addEventListener('change', () => {
     const p = currentProfile();
     if (!p) return;
     const rgb = ensureRgbConfig(p);
     rgb.animation = $('set-rgb-animation').value;
-    $('rgb-static-controls').hidden = (rgb.animation !== 'RGB_ANIM_STATIC');
+    if (RAINBOW_ANIMATIONS.has(rgb.animation) && !rgb.speed) {
+      rgb.speed = DEFAULT_RAINBOW_SPEED;
+    }
+    renderRgbSection(p);
+    buildControllerSVG();   // ring style may flip to/from rainbow
+  });
+
+  // Rainbow speed slider — 5 fixed steps mapped to firmware speed values.
+  $('set-rgb-speed').addEventListener('input', () => {
+    const p = currentProfile();
+    if (!p) return;
+    const rgb = ensureRgbConfig(p);
+    const step = parseInt($('set-rgb-speed').value, 10) || 0;
+    rgb.speed = RAINBOW_SPEED_STEPS[step] ?? DEFAULT_RAINBOW_SPEED;
   });
 
   // RGB color swatch: opens the HSV picker
@@ -2436,14 +2859,36 @@ function wireSettingsHandlers() {
     }
   });
 
-  // Apply the static color to every currently-mapped button in this profile.
-  $('btn-apply-rgb').addEventListener('click', () => {
+  // "+" — save the currently-typed color into the swatch palette.
+  $('btn-save-color').addEventListener('click', () => {
+    const hex = $('set-rgb-color-hex').value;
+    if (!addSavedColor(hex)) {
+      // parseHexInput failed (or duplicate) — flash the input to hint.
+      $('set-rgb-color-hex').classList.add('invalid');
+      setTimeout(() => $('set-rgb-color-hex').classList.remove('invalid'), 400);
+    }
+  });
+
+  // "Apply to mapped buttons" — paints every mapped button.
+  //  - Static animation: paints the static color from the hex input.
+  //  - Rainbow animation: paints 0xFFFFFF (firmware's "participate" sentinel),
+  //    so all mapped buttons join the rainbow. Buttons not painted here stay
+  //    dark during the animation. The user clicks this only when they want
+  //    the rainbow to cover everything mapped.
+  // Both Apply buttons (one per mode block) share this handler.
+  const applyRgbToMapped = () => {
     const p = currentProfile();
     if (!p) return;
-    const colorInt = parseHexInput($('set-rgb-color-hex').value);
-    if (colorInt == null) { $('set-rgb-color-hex').classList.add('invalid'); return; }
     const rgb = ensureRgbConfig(p);
-    rgb.defaultColor = colorInt;
+    const rainbow = RAINBOW_ANIMATIONS.has(rgb.animation);
+    let colorInt;
+    if (rainbow) {
+      colorInt = RAINBOW_PARTICIPATING_COLOR;
+    } else {
+      colorInt = parseHexInput($('set-rgb-color-hex').value);
+      if (colorInt == null) { $('set-rgb-color-hex').classList.add('invalid'); return; }
+      rgb.defaultColor = colorInt;
+    }
     const keyboardMode = isKeyboardProfile(p);
     const rmap = remapMap(p);
     for (const btn of BUTTON_LAYOUT) {
@@ -2453,7 +2898,9 @@ function wireSettingsHandlers() {
       if (active) setButtonColor(p, btn.id, colorInt);
     }
     buildControllerSVG();
-  });
+  };
+  $('btn-apply-rgb-static').addEventListener('click', applyRgbToMapped);
+  $('btn-apply-rgb-rainbow').addEventListener('click', applyRgbToMapped);
 
   $('btn-add-socd').addEventListener('click', () => {
     const p = currentProfile();
@@ -2523,8 +2970,12 @@ function openHsvPicker(anchorEl, colorInt, onChange) {
   const pr = picker.getBoundingClientRect();
   const ar = anchorEl.getBoundingClientRect();
   const gap = 10;
-  let left = ar.right + gap;
-  if (left + pr.width > window.innerWidth - 12) left = ar.left - pr.width - gap;
+  // Prefer placing the picker to the LEFT of the anchor so it doesn't cover
+  // the hex input / "Apply to mapped buttons" controls that sit to the right
+  // of the swatch. Fall back to the right side only if there isn't room.
+  let left = ar.left - pr.width - gap;
+  if (left < 8) left = ar.right + gap;
+  if (left + pr.width > window.innerWidth - 12) left = window.innerWidth - pr.width - 12;
   if (left < 8) left = 8;
   let top = ar.top + ar.height / 2 - pr.height / 2;
   if (top + pr.height > window.innerHeight - 12) top = window.innerHeight - pr.height - 12;
@@ -2589,6 +3040,96 @@ function wireHsvPickerHandlers() {
 }
 
 // ---------------------------------------------------------------------------
+// Controller-button hover tooltips
+//
+// Each .btn-group in the SVG carries a data-tooltip attribute ("LF2 (L-Down)").
+// We use mouseover/mouseout for target detection (fires once per transition
+// instead of ~60 Hz) and reserve mousemove for cursor-tracking while the
+// tooltip is already visible. The rect is measured once at reveal and reused
+// for the rest of the hover, avoiding a layout-read-after-write on each move.
+// ---------------------------------------------------------------------------
+function wireButtonTooltips() {
+  const TOOLTIP_DELAY_MS = 500;
+  const GUTTER = 8;
+  const OFFSET = 14;
+
+  const tooltipEl = $('btn-tooltip');
+  const svgEl = svg();
+
+  let target = null;
+  let timer  = null;
+  let cachedW = 0;
+  let cachedH = 0;
+  // Latest cursor position over the SVG. Updated on every mousemove so the
+  // dwell-delay setTimeout shows the tooltip at the cursor's CURRENT location,
+  // not where the cursor first entered the button.
+  let lastX = 0;
+  let lastY = 0;
+
+  const cancelTimer = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  const hide = () => {
+    cancelTimer();
+    target = null;
+    tooltipEl.classList.add('hidden');
+  };
+  const position = (clientX, clientY) => {
+    let left = clientX + OFFSET;
+    let top  = clientY + OFFSET;
+    if (left + cachedW > window.innerWidth  - GUTTER) left = clientX - cachedW - OFFSET;
+    if (top  + cachedH > window.innerHeight - GUTTER) top  = clientY - cachedH - OFFSET;
+    if (left < GUTTER) left = GUTTER;
+    if (top  < GUTTER) top  = GUTTER;
+    tooltipEl.style.left = `${Math.round(left)}px`;
+    tooltipEl.style.top  = `${Math.round(top)}px`;
+  };
+
+  svgEl.addEventListener('mouseover', (e) => {
+    const grp = e.target.closest('.btn-group');
+    if (!grp || grp === target) return;
+    const text = grp.getAttribute('data-tooltip');
+    if (!text) return;
+    cancelTimer();
+    target = grp;
+    tooltipEl.classList.add('hidden');
+    lastX = e.clientX;
+    lastY = e.clientY;
+    timer = setTimeout(() => {
+      timer = null;
+      tooltipEl.textContent = text;
+      tooltipEl.classList.remove('hidden');
+      // Measure once now that content + visibility are set; reused on each
+      // mousemove for the rest of this hover.
+      const r = tooltipEl.getBoundingClientRect();
+      cachedW = r.width;
+      cachedH = r.height;
+      position(lastX, lastY);
+    }, TOOLTIP_DELAY_MS);
+  });
+
+  svgEl.addEventListener('mouseout', (e) => {
+    const grp = e.target.closest('.btn-group');
+    if (!grp || grp !== target) return;
+    // mouseout also fires when crossing between SVG children of the same
+    // group — ignore those.
+    const toGrp = e.relatedTarget?.closest?.('.btn-group');
+    if (toGrp === grp) return;
+    hide();
+  });
+
+  svgEl.addEventListener('mousemove', (e) => {
+    // Always track the latest cursor position so the dwell timer can reveal
+    // the tooltip at the cursor's *current* spot.
+    lastX = e.clientX;
+    lastY = e.clientY;
+    // Cursor-tracking only paints after the dwell timer has fired.
+    if (!target || timer) return;
+    position(e.clientX, e.clientY);
+  });
+
+  svgEl.addEventListener('mouseleave', hide);
+}
+
+// ---------------------------------------------------------------------------
 // Toolbar event wiring
 // ---------------------------------------------------------------------------
 function wireToolbarHandlers() {
@@ -2598,9 +3139,9 @@ function wireToolbarHandlers() {
 
   $('btn-load').addEventListener('click', loadConfigFromDevice);
   $('btn-save').addEventListener('click', saveConfigToDevice);
-  $('btn-defaults').addEventListener('click', () => {
-    if (config && !confirm('Load defaults? This will replace the current config.')) return;
-    loadDefaultConfig();
+  $('btn-defaults').addEventListener('click', e => {
+    if (!config) { loadDefaultConfig(); return; }
+    confirmNearAnchor(e.currentTarget, 'Load defaults?', loadDefaultConfig);
   });
   $('btn-export').addEventListener('click', exportConfig);
   $('file-import').addEventListener('change', e => {
@@ -2699,6 +3240,19 @@ function wireToolbarHandlers() {
     buildControllerSVG();
   });
 
+  // "Assign Esc" — Escape during capture cancels, so it can't be bound that
+  // way. This button is the only way to actually bind Escape (HID 41).
+  $('popup-keyboard-esc').addEventListener('click', () => {
+    const profile = currentProfile();
+    if (!profile || !selectedBtnId) return;
+    setButtonKeycode(profile, selectedBtnId, 41);
+    keyboardCapturing = false;
+    const el = $('popup-keyboard-input');
+    el.classList.remove('capturing');
+    el.textContent = keycodeToLabel(41);
+    buildControllerSVG();
+  });
+
   $('popup-remove-lighting').addEventListener('click', () => {
     const profile = currentProfile();
     if (!profile || !selectedBtnId) return;
@@ -2708,6 +3262,34 @@ function wireToolbarHandlers() {
     $('popup-color-hex').value = '#000000';
     $('popup-color-hex').classList.remove('invalid');
     applyLiveButtonColor(selectedBtnId, 0);
+  });
+
+  // Rainbow-mode per-button toggles. The two buttons set the stored color to
+  // 0xFFFFFF (participate) or 0 (LED off) — those are the only two states the
+  // firmware distinguishes during a rainbow animation.
+  $('popup-rainbow-on').addEventListener('click', () => {
+    const profile = currentProfile();
+    if (!profile || !selectedBtnId) return;
+    setButtonColor(profile, selectedBtnId, RAINBOW_PARTICIPATING_COLOR);
+    syncPopupRainbowControls(selectedBtnId);
+    buildControllerSVG();   // ring needs to flip to the rainbow gradient
+  });
+  $('popup-rainbow-off').addEventListener('click', () => {
+    const profile = currentProfile();
+    if (!profile || !selectedBtnId) return;
+    setButtonColor(profile, selectedBtnId, 0);
+    syncPopupRainbowControls(selectedBtnId);
+    buildControllerSVG();
+  });
+
+  // "+" save-color button inside the assign popup — same logic as the
+  // right-panel button, but reads the popup's own hex input.
+  $('popup-save-color').addEventListener('click', () => {
+    const hex = $('popup-color-hex').value;
+    if (!addSavedColor(hex)) {
+      $('popup-color-hex').classList.add('invalid');
+      setTimeout(() => $('popup-color-hex').classList.remove('invalid'), 400);
+    }
   });
 
   // Profile context-menu actions
@@ -2720,6 +3302,17 @@ function wireToolbarHandlers() {
     if (idx < 0) return;
     if (action === 'rename')    startRenameProfile(idx);
     if (action === 'duplicate') duplicateProfile(idx);
+  });
+
+  // Saved-color context-menu actions
+  $('saved-color-menu').addEventListener('click', (e) => {
+    const action = e.target?.dataset?.action;
+    if (!action) return;
+    e.stopPropagation();
+    const hex = savedColorMenuTarget;
+    closeSavedColorMenu();
+    if (!hex) return;
+    if (action === 'remove') removeSavedColor(hex);
   });
 
   // Suppress the browser's native context menu inside the sidebar so our
@@ -2742,6 +3335,11 @@ function wireToolbarHandlers() {
     if (!ctx.classList.contains('hidden') && !ctx.contains(e.target)) {
       closeProfileContextMenu();
     }
+    // Same for the saved-color context menu
+    const scm = $('saved-color-menu');
+    if (!scm.classList.contains('hidden') && !scm.contains(e.target)) {
+      closeSavedColorMenu();
+    }
     const popup = $('output-popup');
     if (popup.classList.contains('hidden')) return;
     if (popup.contains(e.target)) return;
@@ -2754,6 +3352,7 @@ function wireToolbarHandlers() {
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (!$('hsl-picker').classList.contains('hidden')) { closeHsvPicker(); return; }
+    if (!$('saved-color-menu').classList.contains('hidden')) { closeSavedColorMenu(); return; }
     if (!$('profile-context-menu').classList.contains('hidden')) { closeProfileContextMenu(); return; }
     if (!$('output-popup').classList.contains('hidden')) closeOutputPopup();
     else if (!$('help-overlay').classList.contains('hidden')) $('help-overlay').classList.add('hidden');
@@ -2772,14 +3371,69 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// Floating confirm popup anchored next to a triggering button. Replaces the
+// native window.confirm() so the prompt stays inside the app's visual style.
+// Calls onConfirm() only if the ✓ button (or Enter) is pressed; ✕, Escape, or
+// any outside click dismisses without firing.
+let activeConfirmPopup = null;
+function confirmNearAnchor(anchor, message, onConfirm) {
+  dismissConfirmPopup();
+  const popup = document.createElement('div');
+  popup.className = 'confirm-popup';
+  popup.innerHTML = `
+    <div class="confirm-popup-msg">${escHtml(message)}</div>
+    <div class="confirm-popup-actions">
+      <button type="button" class="confirm-popup-yes" title="Confirm" aria-label="Confirm">✓</button>
+      <button type="button" class="confirm-popup-no" title="Cancel" aria-label="Cancel">✕</button>
+    </div>
+  `;
+  document.body.appendChild(popup);
+
+  // Position centered below the anchor, flipping above and clamping to viewport.
+  const rect = anchor.getBoundingClientRect();
+  const pr = popup.getBoundingClientRect();
+  const margin = 8;
+  let top = rect.bottom + 6;
+  let left = rect.left + rect.width / 2 - pr.width / 2;
+  if (left < margin) left = margin;
+  if (left + pr.width > window.innerWidth - margin) left = window.innerWidth - pr.width - margin;
+  if (top + pr.height > window.innerHeight - margin) top = rect.top - pr.height - 6;
+  popup.style.top = `${top + window.scrollY}px`;
+  popup.style.left = `${left + window.scrollX}px`;
+
+  const cleanup = () => {
+    document.removeEventListener('mousedown', onOutside, true);
+    document.removeEventListener('keydown', onKey, true);
+    popup.remove();
+    if (activeConfirmPopup === popup) activeConfirmPopup = null;
+  };
+  const onOutside = (e) => { if (!popup.contains(e.target)) cleanup(); };
+  const onKey = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); cleanup(); }
+    else if (e.key === 'Enter') { e.preventDefault(); cleanup(); onConfirm(); }
+  };
+  popup.querySelector('.confirm-popup-yes').addEventListener('click', () => { cleanup(); onConfirm(); });
+  popup.querySelector('.confirm-popup-no').addEventListener('click', cleanup);
+  // Defer outside-click handler so the click that opened the popup doesn't immediately close it.
+  setTimeout(() => {
+    document.addEventListener('mousedown', onOutside, true);
+    document.addEventListener('keydown', onKey, true);
+  }, 0);
+  activeConfirmPopup = popup;
+}
+function dismissConfirmPopup() {
+  if (activeConfirmPopup) activeConfirmPopup.remove();
+  activeConfirmPopup = null;
+}
+
 // ---------------------------------------------------------------------------
 // Default config (embedded JSON)
 // Source: GlyphUserProfiles.json — the official Limit Labs default profiles.
 // Each non-default-output button is explicitly listed in buttonRemapping with
 // an empty `activates` field, marking it as disabled in that profile. This is
-// how the original configurator decides which buttons to grey out.
+// how the original configurator decides which buttons to gray out.
 // ---------------------------------------------------------------------------
-const DEFAULT_CONFIG_JSON = `{"gameModeConfigs":[{"modeId":"MODE_MELEE","name":"Melee","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP_NO_REAC"}],"buttonRemapping":[{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":1,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_PROJECT_M","name":"Brawl","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP_NO_REAC"}],"buttonRemapping":[{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":2,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_ULTIMATE","name":"Ultimate","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP"}],"buttonRemapping":[{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":3,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_FGC","name":"Split FGC","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_LT1","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_RT1","activates":"BTN_LT1"},{"physicalButton":"BTN_LF5","activates":"BTN_LT2"},{"physicalButton":"BTN_RF9","activates":"BTN_RT1"},{"physicalButton":"BTN_LF4"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT2"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_RT2"},{"physicalButton":"BTN_RT3"},{"physicalButton":"BTN_RT4"},{"physicalButton":"BTN_RT5"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":4,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_XB_START"]},{"modeId":"MODE_FGC","name":"FGC","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_LT1","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_RF1","activates":"BTN_RF4"},{"physicalButton":"BTN_RF5","activates":"BTN_RF8"},{"physicalButton":"BTN_LF8","activates":"BTN_LF3"},{"physicalButton":"BTN_LF7","activates":"BTN_LF2"},{"physicalButton":"BTN_LF6","activates":"BTN_LF1"},{"physicalButton":"BTN_LT6","activates":"BTN_LT1"},{"physicalButton":"BTN_RF10","activates":"BTN_RF1"},{"physicalButton":"BTN_RF11","activates":"BTN_RF2"},{"physicalButton":"BTN_RF12","activates":"BTN_RF3"},{"physicalButton":"BTN_RF13","activates":"BTN_RF5"},{"physicalButton":"BTN_RF14","activates":"BTN_RF6"},{"physicalButton":"BTN_RF15","activates":"BTN_RF7"},{"physicalButton":"BTN_RF16","activates":"BTN_LT2"},{"physicalButton":"BTN_LF1"},{"physicalButton":"BTN_LF2"},{"physicalButton":"BTN_LF3"},{"physicalButton":"BTN_LF4"},{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LT1"},{"physicalButton":"BTN_LT2"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_RF2"},{"physicalButton":"BTN_RF3"},{"physicalButton":"BTN_RF4"},{"physicalButton":"BTN_RF6"},{"physicalButton":"BTN_RF7"},{"physicalButton":"BTN_RF8"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RT1"},{"physicalButton":"BTN_RT2"},{"physicalButton":"BTN_RT3"},{"physicalButton":"BTN_RT4"},{"physicalButton":"BTN_RT5"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":5,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_XB_START"]},{"modeId":"MODE_64","name":"Smash64","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_RT2"},{"physicalButton":"BTN_RT3"},{"physicalButton":"BTN_RT4"},{"physicalButton":"BTN_RT5"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"},{"physicalButton":"BTN_MB4"},{"physicalButton":"BTN_MB5"},{"physicalButton":"BTN_MB6"}],"rgbConfig":6,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_N64"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_START"]},{"modeId":"MODE_RIVALS_OF_AETHER","name":"RoA","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP"}],"buttonRemapping":[{"physicalButton":"BTN_RF7","activates":"BTN_LF7"},{"physicalButton":"BTN_RF8","activates":"BTN_LT6"},{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":7,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_RIVALS2","name":"RoA2","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP"}],"buttonRemapping":[{"physicalButton":"BTN_RF7","activates":"BTN_LF7"},{"physicalButton":"BTN_RF8","activates":"BTN_LT6"},{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":8,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_MELEE","name":"GameCube","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_LF2","activates":"BTN_RF4"},{"physicalButton":"BTN_LF6","activates":"BTN_LF8"},{"physicalButton":"BTN_LF5","activates":"BTN_LF2"},{"physicalButton":"BTN_RF13","activates":"BTN_LT6"},{"physicalButton":"BTN_RF10","activates":"BTN_LF7"},{"physicalButton":"BTN_RF11","activates":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF4"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":9,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_MELEE","name":"N64","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_LF2","activates":"BTN_RF4"},{"physicalButton":"BTN_RF2","activates":"BTN_RF5"},{"physicalButton":"BTN_LF6","activates":"BTN_LF8"},{"physicalButton":"BTN_LF5","activates":"BTN_LF2"},{"physicalButton":"BTN_RF13","activates":"BTN_LT6"},{"physicalButton":"BTN_RF11","activates":"BTN_LF6"},{"physicalButton":"BTN_RF10","activates":"BTN_LF7"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF4"},{"physicalButton":"BTN_RF5"},{"physicalButton":"BTN_RF6"},{"physicalButton":"BTN_RF7"},{"physicalButton":"BTN_RF8"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":10,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_N64"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_FGC","name":"SNES","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_LT1","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_LF2","activates":"BTN_LT1"},{"physicalButton":"BTN_LT1","activates":"BTN_RF8"},{"physicalButton":"BTN_RT1","activates":"BTN_RF7"},{"physicalButton":"BTN_RF1","activates":"BTN_RF2"},{"physicalButton":"BTN_RF2","activates":"BTN_RF1"},{"physicalButton":"BTN_RF5","activates":"BTN_RF6"},{"physicalButton":"BTN_RF6","activates":"BTN_RF5"},{"physicalButton":"BTN_LF5","activates":"BTN_LF2"},{"physicalButton":"BTN_LF4"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT2"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF3"},{"physicalButton":"BTN_RF4"},{"physicalButton":"BTN_RF7"},{"physicalButton":"BTN_RF8"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_RT2"},{"physicalButton":"BTN_RT3"},{"physicalButton":"BTN_RT4"},{"physicalButton":"BTN_RT5"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"},{"physicalButton":"BTN_MB4"},{"physicalButton":"BTN_MB5"}],"rgbConfig":11,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_SNES"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_FGC","name":"NES","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_LT1","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_LF2","activates":"BTN_LT1"},{"physicalButton":"BTN_RF1","activates":"BTN_RF2"},{"physicalButton":"BTN_RF2","activates":"BTN_RF1"},{"physicalButton":"BTN_LF5","activates":"BTN_LF2"},{"physicalButton":"BTN_LF4"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT1"},{"physicalButton":"BTN_LT2"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF3"},{"physicalButton":"BTN_RF4"},{"physicalButton":"BTN_RF5"},{"physicalButton":"BTN_RF6"},{"physicalButton":"BTN_RF7"},{"physicalButton":"BTN_RF8"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_RT1"},{"physicalButton":"BTN_RT2"},{"physicalButton":"BTN_RT3"},{"physicalButton":"BTN_RT4"},{"physicalButton":"BTN_RT5"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"},{"physicalButton":"BTN_MB4"},{"physicalButton":"BTN_MB5"}],"rgbConfig":12,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_NES"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_KEYBOARD","name":"Keyboard","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_LT1","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP"}],"keyboardModeConfig":1,"rgbConfig":13,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT"]}],"communicationBackendConfigs":[{"backendId":"COMMS_BACKEND_XINPUT","defaultModeConfig":1},{"backendId":"COMMS_BACKEND_NINTENDO_SWITCH","defaultModeConfig":1},{"backendId":"COMMS_BACKEND_DINPUT","defaultModeConfig":1},{"backendId":"COMMS_BACKEND_GAMECUBE","defaultModeConfig":1},{"backendId":"COMMS_BACKEND_N64","defaultModeConfig":6},{"backendId":"COMMS_BACKEND_NES","defaultModeConfig":12},{"backendId":"COMMS_BACKEND_SNES","defaultModeConfig":11},{"backendId":"COMMS_BACKEND_CONFIGURATOR","activationBinding":["BTN_RT2"]}],"keyboardModes":[{"buttonsToKeycodes":[{"button":"BTN_LF1","keycode":4},{"button":"BTN_LF2","keycode":5},{"button":"BTN_LF3","keycode":6},{"button":"BTN_LF4","keycode":7},{"button":"BTN_LF5","keycode":8},{"button":"BTN_LF6","keycode":9},{"button":"BTN_LF7","keycode":10},{"button":"BTN_LF8","keycode":11},{"button":"BTN_LT1","keycode":12},{"button":"BTN_LT2","keycode":13},{"button":"BTN_LT3","keycode":14},{"button":"BTN_LT4","keycode":15},{"button":"BTN_LT5","keycode":16},{"button":"BTN_LT6","keycode":17},{"button":"BTN_RF1","keycode":18},{"button":"BTN_RF2","keycode":19},{"button":"BTN_RF3","keycode":20},{"button":"BTN_RF4","keycode":21},{"button":"BTN_RF5","keycode":22},{"button":"BTN_RF6","keycode":23},{"button":"BTN_RF7","keycode":24},{"button":"BTN_RF8","keycode":25},{"button":"BTN_RF9","keycode":26},{"button":"BTN_RF10","keycode":27},{"button":"BTN_RF11","keycode":28},{"button":"BTN_RF12","keycode":29},{"button":"BTN_RF13","keycode":30},{"button":"BTN_RF14","keycode":31},{"button":"BTN_RF15","keycode":32},{"button":"BTN_RF16","keycode":33},{"button":"BTN_RT1","keycode":34},{"button":"BTN_RT2","keycode":35},{"button":"BTN_RT3","keycode":36},{"button":"BTN_RT4","keycode":37},{"button":"BTN_RT5","keycode":38}]}],"defaultBackendConfig":1,"defaultUsbBackendConfig":1,"rgbBrightness":255,"defaultDashboardOption":"DASHBOARD_MENU_BUTTON_HINTS"}`;
+const DEFAULT_CONFIG_JSON = `{"gameModeConfigs":[{"modeId":"MODE_MELEE","name":"Melee","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP_NO_REAC"}],"buttonRemapping":[{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":1,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_PROJECT_M","name":"Brawl","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP_NO_REAC"}],"buttonRemapping":[{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":2,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_ULTIMATE","name":"Ultimate","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP"}],"buttonRemapping":[{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":3,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_FGC","name":"Split FGC","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_LT1","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_RT1","activates":"BTN_LT1"},{"physicalButton":"BTN_LF5","activates":"BTN_LT2"},{"physicalButton":"BTN_RF9","activates":"BTN_RT1"},{"physicalButton":"BTN_LF4"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT2"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_RT2"},{"physicalButton":"BTN_RT3"},{"physicalButton":"BTN_RT4"},{"physicalButton":"BTN_RT5"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":4,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_XB_START"]},{"modeId":"MODE_FGC","name":"FGC","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_LT1","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_RF1","activates":"BTN_RF4"},{"physicalButton":"BTN_RF5","activates":"BTN_RF8"},{"physicalButton":"BTN_LF8","activates":"BTN_LF3"},{"physicalButton":"BTN_LF7","activates":"BTN_LF2"},{"physicalButton":"BTN_LF6","activates":"BTN_LF1"},{"physicalButton":"BTN_LT6","activates":"BTN_LT1"},{"physicalButton":"BTN_RF10","activates":"BTN_RF1"},{"physicalButton":"BTN_RF11","activates":"BTN_RF2"},{"physicalButton":"BTN_RF12","activates":"BTN_RF3"},{"physicalButton":"BTN_RF13","activates":"BTN_RF5"},{"physicalButton":"BTN_RF14","activates":"BTN_RF6"},{"physicalButton":"BTN_RF15","activates":"BTN_RF7"},{"physicalButton":"BTN_RF16","activates":"BTN_LT2"},{"physicalButton":"BTN_LF1"},{"physicalButton":"BTN_LF2"},{"physicalButton":"BTN_LF3"},{"physicalButton":"BTN_LF4"},{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LT1"},{"physicalButton":"BTN_LT2"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_RF2"},{"physicalButton":"BTN_RF3"},{"physicalButton":"BTN_RF4"},{"physicalButton":"BTN_RF6"},{"physicalButton":"BTN_RF7"},{"physicalButton":"BTN_RF8"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RT1"},{"physicalButton":"BTN_RT2"},{"physicalButton":"BTN_RT3"},{"physicalButton":"BTN_RT4"},{"physicalButton":"BTN_RT5"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":5,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_XB_START"]},{"modeId":"MODE_64","name":"Smash64","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_RT2"},{"physicalButton":"BTN_RT3"},{"physicalButton":"BTN_RT4"},{"physicalButton":"BTN_RT5"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"},{"physicalButton":"BTN_MB4"},{"physicalButton":"BTN_MB5"},{"physicalButton":"BTN_MB6"}],"rgbConfig":6,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_N64"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_START"]},{"modeId":"MODE_RIVALS_OF_AETHER","name":"RoA","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_LF7","buttonDir2":"BTN_LT6"}],"buttonRemapping":[{"physicalButton":"BTN_RF7","activates":"BTN_LF7"},{"physicalButton":"BTN_RF8","activates":"BTN_LT6"},{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":7,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_RIVALS2","name":"RoA2","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_LF7","buttonDir2":"BTN_LT6"}],"buttonRemapping":[{"physicalButton":"BTN_RF7","activates":"BTN_LF7"},{"physicalButton":"BTN_RF8","activates":"BTN_LT6"},{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":8,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_MELEE","name":"GameCube","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_LF2","activates":"BTN_RF4"},{"physicalButton":"BTN_LF6","activates":"BTN_LF8"},{"physicalButton":"BTN_LF5","activates":"BTN_LF2"},{"physicalButton":"BTN_RF13","activates":"BTN_LT6"},{"physicalButton":"BTN_RF10","activates":"BTN_LF7"},{"physicalButton":"BTN_RF11","activates":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF4"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":9,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_MELEE","name":"N64","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_LF2","activates":"BTN_RF4"},{"physicalButton":"BTN_RF2","activates":"BTN_RF5"},{"physicalButton":"BTN_LF6","activates":"BTN_LF8"},{"physicalButton":"BTN_LF5","activates":"BTN_LF2"},{"physicalButton":"BTN_RF13","activates":"BTN_LT6"},{"physicalButton":"BTN_RF11","activates":"BTN_LF6"},{"physicalButton":"BTN_RF10","activates":"BTN_LF7"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF4"},{"physicalButton":"BTN_RF5"},{"physicalButton":"BTN_RF6"},{"physicalButton":"BTN_RF7"},{"physicalButton":"BTN_RF8"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":10,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_N64"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_FGC","name":"SNES","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_LT1","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_LF2","activates":"BTN_LT1"},{"physicalButton":"BTN_LT1","activates":"BTN_RF8"},{"physicalButton":"BTN_RT1","activates":"BTN_RF7"},{"physicalButton":"BTN_RF1","activates":"BTN_RF2"},{"physicalButton":"BTN_RF2","activates":"BTN_RF1"},{"physicalButton":"BTN_RF5","activates":"BTN_RF6"},{"physicalButton":"BTN_RF6","activates":"BTN_RF5"},{"physicalButton":"BTN_LF5","activates":"BTN_LF2"},{"physicalButton":"BTN_LF4"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT2"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF3"},{"physicalButton":"BTN_RF4"},{"physicalButton":"BTN_RF7"},{"physicalButton":"BTN_RF8"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_RT2"},{"physicalButton":"BTN_RT3"},{"physicalButton":"BTN_RT4"},{"physicalButton":"BTN_RT5"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"},{"physicalButton":"BTN_MB4"},{"physicalButton":"BTN_MB5"}],"rgbConfig":11,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_SNES"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_FGC","name":"NES","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_LT1","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_LF2","activates":"BTN_LT1"},{"physicalButton":"BTN_RF1","activates":"BTN_RF2"},{"physicalButton":"BTN_RF2","activates":"BTN_RF1"},{"physicalButton":"BTN_LF5","activates":"BTN_LF2"},{"physicalButton":"BTN_LF4"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT1"},{"physicalButton":"BTN_LT2"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF3"},{"physicalButton":"BTN_RF4"},{"physicalButton":"BTN_RF5"},{"physicalButton":"BTN_RF6"},{"physicalButton":"BTN_RF7"},{"physicalButton":"BTN_RF8"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_RT1"},{"physicalButton":"BTN_RT2"},{"physicalButton":"BTN_RT3"},{"physicalButton":"BTN_RT4"},{"physicalButton":"BTN_RT5"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"},{"physicalButton":"BTN_MB4"},{"physicalButton":"BTN_MB5"}],"rgbConfig":12,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_NES"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_KEYBOARD","name":"Keyboard","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_LT1","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP"}],"keyboardModeConfig":1,"rgbConfig":13,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT"]}],"communicationBackendConfigs":[{"backendId":"COMMS_BACKEND_XINPUT","defaultModeConfig":1},{"backendId":"COMMS_BACKEND_NINTENDO_SWITCH","defaultModeConfig":1},{"backendId":"COMMS_BACKEND_DINPUT","defaultModeConfig":1},{"backendId":"COMMS_BACKEND_GAMECUBE","defaultModeConfig":1},{"backendId":"COMMS_BACKEND_N64","defaultModeConfig":6},{"backendId":"COMMS_BACKEND_NES","defaultModeConfig":12},{"backendId":"COMMS_BACKEND_SNES","defaultModeConfig":11},{"backendId":"COMMS_BACKEND_CONFIGURATOR","activationBinding":["BTN_RT2"]}],"keyboardModes":[{"buttonsToKeycodes":[{"button":"BTN_LF1","keycode":4},{"button":"BTN_LF2","keycode":5},{"button":"BTN_LF3","keycode":6},{"button":"BTN_LF4","keycode":7},{"button":"BTN_LF5","keycode":8},{"button":"BTN_LF6","keycode":9},{"button":"BTN_LF7","keycode":10},{"button":"BTN_LF8","keycode":11},{"button":"BTN_LT1","keycode":12},{"button":"BTN_LT2","keycode":13},{"button":"BTN_LT3","keycode":14},{"button":"BTN_LT4","keycode":15},{"button":"BTN_LT5","keycode":16},{"button":"BTN_LT6","keycode":17},{"button":"BTN_RF1","keycode":18},{"button":"BTN_RF2","keycode":19},{"button":"BTN_RF3","keycode":20},{"button":"BTN_RF4","keycode":21},{"button":"BTN_RF5","keycode":22},{"button":"BTN_RF6","keycode":23},{"button":"BTN_RF7","keycode":24},{"button":"BTN_RF8","keycode":25},{"button":"BTN_RF9","keycode":26},{"button":"BTN_RF10","keycode":27},{"button":"BTN_RF11","keycode":28},{"button":"BTN_RF12","keycode":29},{"button":"BTN_RF13","keycode":30},{"button":"BTN_RF14","keycode":31},{"button":"BTN_RF15","keycode":32},{"button":"BTN_RF16","keycode":33},{"button":"BTN_RT1","keycode":34},{"button":"BTN_RT2","keycode":35},{"button":"BTN_RT3","keycode":36},{"button":"BTN_RT4","keycode":37},{"button":"BTN_RT5","keycode":38}]}],"rgbConfigs":[{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LF4","color":2282478},{"button":"BTN_LT1","color":2282478},{"button":"BTN_LT2","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_RF3","color":2282478},{"button":"BTN_RF4","color":2282478},{"button":"BTN_RF5","color":2282478},{"button":"BTN_RF6","color":2282478},{"button":"BTN_RF7","color":2282478},{"button":"BTN_RF8","color":2282478},{"button":"BTN_RT1","color":2282478},{"button":"BTN_RT2","color":2282478},{"button":"BTN_RT3","color":2282478},{"button":"BTN_RT4","color":2282478},{"button":"BTN_RT5","color":2282478},{"button":"BTN_MB1","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LF4","color":2282478},{"button":"BTN_LT1","color":2282478},{"button":"BTN_LT2","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_RF3","color":2282478},{"button":"BTN_RF4","color":2282478},{"button":"BTN_RF5","color":2282478},{"button":"BTN_RF6","color":2282478},{"button":"BTN_RF7","color":2282478},{"button":"BTN_RF8","color":2282478},{"button":"BTN_RT1","color":2282478},{"button":"BTN_RT2","color":2282478},{"button":"BTN_RT3","color":2282478},{"button":"BTN_RT4","color":2282478},{"button":"BTN_RT5","color":2282478},{"button":"BTN_MB1","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LF4","color":2282478},{"button":"BTN_LT1","color":2282478},{"button":"BTN_LT2","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_RF3","color":2282478},{"button":"BTN_RF4","color":2282478},{"button":"BTN_RF5","color":2282478},{"button":"BTN_RF6","color":2282478},{"button":"BTN_RF7","color":2282478},{"button":"BTN_RF8","color":2282478},{"button":"BTN_RT1","color":2282478},{"button":"BTN_RT2","color":2282478},{"button":"BTN_RT3","color":2282478},{"button":"BTN_RT4","color":2282478},{"button":"BTN_RT5","color":2282478},{"button":"BTN_MB1","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LF5","color":2282478},{"button":"BTN_LT1","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_RF3","color":2282478},{"button":"BTN_RF4","color":2282478},{"button":"BTN_RF5","color":2282478},{"button":"BTN_RF6","color":2282478},{"button":"BTN_RF7","color":2282478},{"button":"BTN_RF8","color":2282478},{"button":"BTN_RF9","color":2282478},{"button":"BTN_RT1","color":2282478},{"button":"BTN_MB1","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF8","color":2282478},{"button":"BTN_LF7","color":2282478},{"button":"BTN_LF6","color":2282478},{"button":"BTN_LT6","color":2282478},{"button":"BTN_RF10","color":2282478},{"button":"BTN_RF11","color":2282478},{"button":"BTN_RF12","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF13","color":2282478},{"button":"BTN_RF14","color":2282478},{"button":"BTN_RF15","color":2282478},{"button":"BTN_RF5","color":2282478},{"button":"BTN_RF16","color":2282478},{"button":"BTN_MB1","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LF4","color":2282478},{"button":"BTN_LT1","color":2282478},{"button":"BTN_LT2","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_RF3","color":2282478},{"button":"BTN_RF4","color":2282478},{"button":"BTN_RF5","color":2282478},{"button":"BTN_RF6","color":2282478},{"button":"BTN_RT1","color":2282478},{"button":"BTN_MB1","color":2282478},{"button":"BTN_RF7","color":2282478},{"button":"BTN_RF8","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LF4","color":2282478},{"button":"BTN_LT1","color":2282478},{"button":"BTN_LT2","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_RF3","color":2282478},{"button":"BTN_RF4","color":2282478},{"button":"BTN_RF5","color":2282478},{"button":"BTN_RF6","color":2282478},{"button":"BTN_RF7","color":2282478},{"button":"BTN_RF8","color":2282478},{"button":"BTN_RT1","color":2282478},{"button":"BTN_RT2","color":2282478},{"button":"BTN_RT3","color":2282478},{"button":"BTN_RT4","color":2282478},{"button":"BTN_RT5","color":2282478},{"button":"BTN_MB1","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LF4","color":2282478},{"button":"BTN_LT1","color":2282478},{"button":"BTN_LT2","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_RF3","color":2282478},{"button":"BTN_RF4","color":2282478},{"button":"BTN_RF5","color":2282478},{"button":"BTN_RF6","color":2282478},{"button":"BTN_RF7","color":2282478},{"button":"BTN_RF8","color":2282478},{"button":"BTN_RT1","color":2282478},{"button":"BTN_RT2","color":2282478},{"button":"BTN_RT3","color":2282478},{"button":"BTN_RT4","color":2282478},{"button":"BTN_RT5","color":2282478},{"button":"BTN_MB1","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LF4","color":2282478},{"button":"BTN_LT1","color":2282478},{"button":"BTN_LT2","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_RF3","color":2282478},{"button":"BTN_RF5","color":2282478},{"button":"BTN_RF6","color":2282478},{"button":"BTN_RF7","color":2282478},{"button":"BTN_RF8","color":2282478},{"button":"BTN_RT1","color":2282478},{"button":"BTN_RT2","color":2282478},{"button":"BTN_RT3","color":2282478},{"button":"BTN_RT4","color":2282478},{"button":"BTN_RT5","color":2282478},{"button":"BTN_MB1","color":2282478},{"button":"BTN_LF6","color":2282478},{"button":"BTN_LF5","color":2282478},{"button":"BTN_RF13","color":2282478},{"button":"BTN_RF10","color":2282478},{"button":"BTN_RF11","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LF4","color":2282478},{"button":"BTN_LT1","color":2282478},{"button":"BTN_LT2","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_RF3","color":2282478},{"button":"BTN_RT1","color":2282478},{"button":"BTN_RT2","color":2282478},{"button":"BTN_RT3","color":2282478},{"button":"BTN_RT4","color":2282478},{"button":"BTN_RT5","color":2282478},{"button":"BTN_MB1","color":2282478},{"button":"BTN_LF5","color":2282478},{"button":"BTN_RF13","color":2282478},{"button":"BTN_LF6","color":2282478},{"button":"BTN_RF11","color":2282478},{"button":"BTN_RF10","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LT1","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_RF5","color":2282478},{"button":"BTN_RF6","color":2282478},{"button":"BTN_RT1","color":2282478},{"button":"BTN_MB1","color":2282478},{"button":"BTN_LF5","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LF5","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_MB1","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LT1","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_RF5","color":2282478},{"button":"BTN_RF6","color":2282478},{"button":"BTN_RT1","color":2282478},{"button":"BTN_MB1","color":2282478},{"button":"BTN_LF5","color":2282478}],"animation":"RGB_ANIM_STATIC"}],"defaultBackendConfig":1,"defaultUsbBackendConfig":1,"rgbBrightness":255,"defaultDashboardOption":"DASHBOARD_MENU_BUTTON_HINTS"}`;
 
 // ---------------------------------------------------------------------------
 // Init
@@ -2788,6 +3442,11 @@ document.addEventListener('DOMContentLoaded', () => {
   wireToolbarHandlers();
   wireSettingsHandlers();
   wireHsvPickerHandlers();
+  wireButtonTooltips();
+
+  // Restore the user's saved-color palette from localStorage before any
+  // renderRgbSection / popup-open paints it.
+  loadSavedColorsFromStorage();
 
   // Build empty SVG frame
   buildControllerSVG();

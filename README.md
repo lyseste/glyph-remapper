@@ -4,7 +4,7 @@
 
 <p align="center">
   A browser-based configurator for the <strong>Glyph</strong> leverless game controller by <a href="https://limitlabs.com/">Limit Labs</a>. <br>
-  Edit profiles, customise per-button RGB, configure SOCD, and flash configs to the device over WebSerial.
+  Edit profiles, customize per-button RGB, configure SOCD, and flash configs to the device over WebSerial.
 </p>
 
 <p align="center">
@@ -68,8 +68,8 @@ You can also work entirely offline using the **Config File** ⬇ / ⬆ buttons t
 
 - **Visual controller layout** that mirrors the physical Glyph mk6 (35 main buttons + 7 menu buttons).
 - **Per-button remapping** through a click-to-assign popup that shows every output the current mode supports.
-- **Three button-display styles** — Xbox, PlayStation, Switch — with proper colours and glyphs (PS shows the actual cross/circle/square/triangle outlines). GameCube glyphs auto-enable when the GameCube backend is selected.
-- **Per-profile RGB lighting** — per-button colour picker (hex + HSV), default-colour fallback, four animation modes (Static / Rainbow Wave / Rainbow Shift / None), and an **Apply to mapped buttons** shortcut.
+- **Three button-display styles** — Xbox, PlayStation, Switch — with proper colors and glyphs (PS shows the actual cross/circle/square/triangle outlines). GameCube glyphs auto-enable when the GameCube backend is selected.
+- **Per-profile RGB lighting** — per-button color picker (hex + HSV), default-color fallback, four animation modes (Static / Rainbow Wave / Rainbow Shift / None), and an **Apply to mapped buttons** shortcut.
 - **Keyboard mode** with a click-to-capture key input box that uses real USB HID scancodes.
 - **SOCD pair configuration** (resolves up/down or left/right conflicts).
 - **Profile management** — drag-add, right-click rename, right-click duplicate, delete; up to 20 profiles per device.
@@ -102,7 +102,7 @@ The whole configurator is three files. There is no build step.
 7. WebSerial I/O (`serialConnect`, `sendPacket`, `readPacket`, `loadConfigFromDevice`, `saveConfigToDevice`)
 8. protobuf encode/decode (`configToBinary`, `binaryToConfig`)
 9. SVG render loop (`buildControllerSVG`) + `renderButtonIcon` and glyph builders
-10. Popup logic (`openOutputPopup`, `applyOutput`, `unmapSelected`, key-capture, colour controls)
+10. Popup logic (`openOutputPopup`, `applyOutput`, `unmapSelected`, key-capture, color controls)
 11. Sidebar + settings panel rendering and event wiring
 12. `DEFAULT_CONFIG_JSON` — embedded "Load Defaults" payload, mirrors the official Limit Labs default profile set
 13. `DOMContentLoaded` boot
@@ -180,7 +180,7 @@ Config
 ├── rgbConfigs[]                      ← LED palettes, shared by index
 │   └── RgbConfig
 │       ├── buttonColors[]            ← { button: 'BTN_X', color: 0xRRGGBB (uint32) }
-│       ├── defaultColor              ← uint32 (fallback colour, defaults to 0x22D3EE)
+│       ├── defaultColor              ← uint32 (fallback color, defaults to 0x22D3EE)
 │       ├── animation                 ← RGB_ANIM_STATIC | RAINBOW_SHIFT | RAINBOW_XWAVE_LEFT | UNSPECIFIED
 │       └── speed
 │
@@ -197,7 +197,7 @@ Config
 
 - **`rgbConfig` and `keyboardModeConfig` are 1-based.** Value `0` means "unset"; index into the array is `value − 1`. Helpers `ensureRgbConfig()` / `ensureKeyboardConfig()` always pad with valid blank objects (never `null`) so protobuf encoding can't fail.
 - **Multiple profiles can share an `rgbConfig` index.** Editing one currently edits the other's palette too. Copy-on-write is a future cleanup.
-- **Colour values are packed uint32** in `0xRRGGBB` form. `colorIntToHex` / `parseHexInput` convert.
+- **Color values are packed uint32** in `0xRRGGBB` form. `colorIntToHex` / `parseHexInput` convert.
 - **Explicit disables** are remap entries with no `activates` field (`{physicalButton: 'BTN_X'}`). This is how the official defaults mark unused buttons; the firmware treats them as no-op.
 
 ---
@@ -228,12 +228,12 @@ This is why **`preserveOutputsAcrossModeChange()`** exists — when the mode cha
 
 ### Menu buttons (MB1 – MB7)
 
-| Button | UI behaviour | Firmware behaviour |
+| Button | UI behavior | Firmware behavior |
 |--------|--------------|--------------------|
-| **MB1** | Not remappable. Popup shows only the LED colour picker. Ring is always visible. | Hardware-reserved menu button (opens device menu). Has a physical LED. |
+| **MB1** | Not remappable. Popup shows only the LED color picker. Ring is always visible. | Hardware-reserved menu button (opens device menu). Has a physical LED. |
 | **MB2 – MB7** | Remappable via the popup (saved to `menuButtonIcon[i]`, not `buttonRemapping`). LED row hidden — these buttons have **no physical LED** on the device. | Icons MB4 = capture, MB5 = home, MB6 = select/back, MB7 = start are hardcoded in every controller mode (`Ultimate.cpp` line 24 etc.), regardless of what `menuButtonIcon` says. `menuButtonIcon` only affects what icon the configurator renders. |
 
-`stripDisabledLeds()` filters out any colour entries for MB2-7 before binary encoding and JSON export, so imported configs can't accidentally leak LED data for buttons that have no LED.
+`stripDisabledLeds()` filters out any color entries for MB2-7 before binary encoding and JSON export, so imported configs can't accidentally leak LED data for buttons that have no LED.
 
 ### Keyboard mode specifics
 
@@ -256,9 +256,9 @@ Coordinates are in user units against the controller SVG's `viewBox="0 0 912 491
 
 ```
 <g class="btn-group btn-menu? btn-large? mapped|unmapped selected?" data-btn="BTN_X">
-  <circle .btn-ring>        ← outer cyan/coloured accent ring (mapped buttons only)
+  <circle .btn-ring>        ← outer cyan/colored accent ring (mapped buttons only)
   <circle .btn-fill>        ← gray base (#707070 unmapped, #404040 mapped)
-  <circle .btn-icon-disk>   ← platform-coloured disk (mapped buttons)
+  <circle .btn-icon-disk>   ← platform-colored disk (mapped buttons)
   <image  .btn-icon-svg>    ← Kenney glyph (if available for this platform+output)
   |  <text .btn-icon-label> ← text label fallback
   |  <line> × 3              ← arrow for d-pad / stick directions
@@ -266,19 +266,19 @@ Coordinates are in user units against the controller SVG's `viewBox="0 0 912 491
 </g>
 ```
 
-### LED ring colour
+### LED ring color
 
-The ring's stroke colour reads from the CSS custom property `--led-color` set inline on the `.btn-group`:
+The ring's stroke color reads from the CSS custom property `--led-color` set inline on the `.btn-group`:
 
 ```css
 .btn-ring { stroke: var(--led-color, var(--btn-mapped-stroke)); }
 ```
 
-`buildControllerSVG()` sets `g.style.setProperty('--led-color', '#ff8800')` per button. `applyLiveButtonColor(btnId, colorInt)` updates a single button's ring without rebuilding the whole SVG — used by the popup's colour picker so the controller reflects the picked colour in real time.
+`buildControllerSVG()` sets `g.style.setProperty('--led-color', '#ff8800')` per button. `applyLiveButtonColor(btnId, colorInt)` updates a single button's ring without rebuilding the whole SVG — used by the popup's color picker so the controller reflects the picked color in real time.
 
 ### Platform styles
 
-A button's visual depends on the **selected platform tab** (Xbox / PlayStation / Switch / GameCube) and the **output id** (`a`, `b`, `x`, `y`, `dup`, `rb`, `lt_light`, …). Lookup goes through `PLATFORM_STYLES[selectedPlatform][outputId]`. PlayStation face buttons use SVG outline shapes (cross / circle / square / triangle); GameCube buttons use Kenney icons; everything else is text labels with platform colouring.
+A button's visual depends on the **selected platform tab** (Xbox / PlayStation / Switch / GameCube) and the **output id** (`a`, `b`, `x`, `y`, `dup`, `rb`, `lt_light`, …). Lookup goes through `PLATFORM_STYLES[selectedPlatform][outputId]`. PlayStation face buttons use SVG outline shapes (cross / circle / square / triangle); GameCube buttons use Kenney icons; everything else is text labels with platform coloring.
 
 ---
 
@@ -370,9 +370,9 @@ Things that bite during encoding:
 
 - `null` entries in `rgbConfigs[]` or `keyboardModes[]` — `protobuf.js` rejects them. Always pad with blank objects, never `null`.
 - Enum values must be **strings** (`'RGB_ANIM_STATIC'`, `'BTN_LF1'`) — the decoder is called with `{ enums: String }`.
-- Colour values are packed `uint32` in `0xRRGGBB`.
+- Color values are packed `uint32` in `0xRRGGBB`.
 
-### Verifying behaviour without a device
+### Verifying behavior without a device
 
 Most of the app works fine without a Glyph plugged in — load defaults, edit, export JSON, re-import, mode-switch, etc. The only paths that require WebSerial are **Connect**, **Load Config**, and **Save to Device**.
 

@@ -715,6 +715,10 @@
           "buttonDir1": "BTN_RT2",
           "buttonDir2": "BTN_RT4",
           "socdType": "SOCD_2IP"
+        },
+        {
+          "buttonDir1": "BTN_LF7",
+          "buttonDir2": "BTN_LT6"
         }
       ],
       "buttonRemapping": [
@@ -825,6 +829,10 @@
           "buttonDir1": "BTN_RT2",
           "buttonDir2": "BTN_RT4",
           "socdType": "SOCD_2IP"
+        },
+        {
+          "buttonDir1": "BTN_LF7",
+          "buttonDir2": "BTN_LT6"
         }
       ],
       "buttonRemapping": [
@@ -1663,6 +1671,949 @@
           "keycode": 38
         }
       ]
+    }
+  ],
+  "rgbConfigs": [
+    {
+      "buttonColors": [
+        {
+          "button": "BTN_LF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF4",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LT1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LT2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF4",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF5",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF6",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF7",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF8",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT4",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT5",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_MB1",
+          "color": 2282478
+        }
+      ],
+      "animation": "RGB_ANIM_STATIC"
+    },
+    {
+      "buttonColors": [
+        {
+          "button": "BTN_LF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF4",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LT1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LT2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF4",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF5",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF6",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF7",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF8",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT4",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT5",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_MB1",
+          "color": 2282478
+        }
+      ],
+      "animation": "RGB_ANIM_STATIC"
+    },
+    {
+      "buttonColors": [
+        {
+          "button": "BTN_LF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF4",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LT1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LT2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF4",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF5",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF6",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF7",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF8",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT4",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT5",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_MB1",
+          "color": 2282478
+        }
+      ],
+      "animation": "RGB_ANIM_STATIC"
+    },
+    {
+      "buttonColors": [
+        {
+          "button": "BTN_LF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF5",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LT1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF4",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF5",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF6",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF7",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF8",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF9",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_MB1",
+          "color": 2282478
+        }
+      ],
+      "animation": "RGB_ANIM_STATIC"
+    },
+    {
+      "buttonColors": [
+        {
+          "button": "BTN_LF8",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF7",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF6",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LT6",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF10",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF11",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF12",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF13",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF14",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF15",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF5",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF16",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_MB1",
+          "color": 2282478
+        }
+      ],
+      "animation": "RGB_ANIM_STATIC"
+    },
+    {
+      "buttonColors": [
+        {
+          "button": "BTN_LF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF4",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LT1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LT2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF4",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF5",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF6",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_MB1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF7",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF8",
+          "color": 2282478
+        }
+      ],
+      "animation": "RGB_ANIM_STATIC"
+    },
+    {
+      "buttonColors": [
+        {
+          "button": "BTN_LF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF4",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LT1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LT2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF4",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF5",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF6",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF7",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF8",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT4",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT5",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_MB1",
+          "color": 2282478
+        }
+      ],
+      "animation": "RGB_ANIM_STATIC"
+    },
+    {
+      "buttonColors": [
+        {
+          "button": "BTN_LF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF4",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LT1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LT2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF4",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF5",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF6",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF7",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF8",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT4",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT5",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_MB1",
+          "color": 2282478
+        }
+      ],
+      "animation": "RGB_ANIM_STATIC"
+    },
+    {
+      "buttonColors": [
+        {
+          "button": "BTN_LF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF4",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LT1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LT2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF5",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF6",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF7",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF8",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT4",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT5",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_MB1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF6",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF5",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF13",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF10",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF11",
+          "color": 2282478
+        }
+      ],
+      "animation": "RGB_ANIM_STATIC"
+    },
+    {
+      "buttonColors": [
+        {
+          "button": "BTN_LF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF4",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LT1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LT2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT4",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT5",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_MB1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF5",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF13",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF6",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF11",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF10",
+          "color": 2282478
+        }
+      ],
+      "animation": "RGB_ANIM_STATIC"
+    },
+    {
+      "buttonColors": [
+        {
+          "button": "BTN_LF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LT1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF5",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF6",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_MB1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF5",
+          "color": 2282478
+        }
+      ],
+      "animation": "RGB_ANIM_STATIC"
+    },
+    {
+      "buttonColors": [
+        {
+          "button": "BTN_LF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF5",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_MB1",
+          "color": 2282478
+        }
+      ],
+      "animation": "RGB_ANIM_STATIC"
+    },
+    {
+      "buttonColors": [
+        {
+          "button": "BTN_LF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF3",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LT1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF2",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF5",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RF6",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_RT1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_MB1",
+          "color": 2282478
+        },
+        {
+          "button": "BTN_LF5",
+          "color": 2282478
+        }
+      ],
+      "animation": "RGB_ANIM_STATIC"
     }
   ],
   "defaultBackendConfig": 1,
