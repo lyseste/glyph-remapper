@@ -7,10 +7,6 @@
   Edit profiles, customize per-button RGB, configure SOCD, and flash configs to the device over WebSerial.
 </p>
 
-<p align="center">
-  <em>Single-page, vanilla JS, no build step, no framework.</em>
-</p>
-
 ---
 
 ## Table of contents
@@ -66,30 +62,18 @@ You can also work entirely offline using the **Config File** ⬇ / ⬆ buttons t
 
 ## Features
 
-- **Visual controller layout** that mirrors the physical Glyph mk6 (35 main buttons + 7 menu buttons).
+- **Visual controller layout** that mirrors the Glyph (35 main buttons + 7 menu buttons).
 - **Per-button remapping** through a click-to-assign popup that shows every output the current mode supports.
-- **Three button-display styles** — Xbox, PlayStation, Switch — with proper colors and glyphs (PS shows the actual cross/circle/square/triangle outlines). GameCube glyphs auto-enable when the GameCube backend is selected.
+- **Three button-display styles** — Xbox, PlayStation, Switch — with proper colors and glyphs. GameCube glyphs auto-enable when the GameCube backend is selected.
 - **Per-profile RGB lighting** — per-button color picker (hex + HSV), default-color fallback, four animation modes (Static / Rainbow Wave / Rainbow Shift / None), and an **Apply to mapped buttons** shortcut.
 - **Keyboard mode** with a click-to-capture key input box that uses real USB HID scancodes.
 - **SOCD pair configuration** (resolves up/down or left/right conflicts).
 - **Profile management** — drag-add, right-click rename, right-click duplicate, delete; up to 20 profiles per device.
-- **Mode switching preserves outputs** — change a profile from Ultimate to FGC and `LF2` keeps producing `L-Down` instead of suddenly becoming `D-Down`.
 - **JSON import/export** for offline editing and backup, fully round-trip safe with the device protobuf.
 
 ---
 
 ## Project layout
-
-The whole configurator is three files. There is no build step.
-
-```
-.
-├── index.html
-├── styles.css
-├── app.js                ← all logic lives here
-├── README.md             ← this file
-└── LICENSE
-```
 
 `app.js` is structured top-to-bottom roughly like this:
 
@@ -115,8 +99,8 @@ This repo only contains the configurator. The firmware and protobuf schema live 
 
 | What | Where | Why you'd need it |
 |------|-------|--------------------|
-| **Glyph firmware** | <https://github.com/LimitLabs/FW-Glyph> | Each mode file in `src/modes/` (e.g. `Ultimate.cpp`, `FgcMode.cpp`, `RivalsOfAether.cpp`) tells you exactly which physical button fires which output — the source of truth for `MODE_OUTPUT_MAP`. |
-| **Protobuf schema** | <https://github.com/GregTurbo/HayBox-proto> (Glyph uses commit `db4e2f6` of GregTurbo's fork) | Defines the `Config` message format we send to the device. The schema is embedded inline in `app.js` as `PROTO_DEF`; refer back to the canonical `.proto` whenever you add or rename fields. |
+| **Glyph firmware** | <https://github.com/LimitLabs/FW-Glyph> | Each mode file in `src/modes/` (e.g. `Ultimate.cpp`, `FgcMode.cpp`, `RivalsOfAether.cpp`) tells you exactly which physical button fires which output — the source used for `MODE_OUTPUT_MAP`. |
+| **Protobuf schema** | <https://github.com/GregTurbo/HayBox-proto> | Defines the `Config` message format we send to the device. The schema is embedded inline in `app.js` as `PROTO_DEF`; refer back to the canonical `.proto` whenever you add or rename fields. |
 | **HayBox** | <https://github.com/JonnyHaystack/HayBox> | The base controller-firmware framework the Glyph builds on, in case you want to understand how modes/backends/inputs are wired together at the framework level. |
 
 Throughout this README, line numbers like `Ultimate.cpp:24` refer to files in the firmware repo above.
@@ -125,7 +109,7 @@ Throughout this README, line numbers like `Ultimate.cpp:24` refer to files in th
 
 ## How the app talks to the device
 
-The Glyph mk6 (RP2040, USB VID/PID `0x2E8A:0x1092`, baud `115200`) speaks a small request/response protocol on a USB CDC serial endpoint. Each packet is:
+The Glyph (RP2040, USB VID/PID `0x2E8A:0x1092`, baud `115200`) speaks a small request/response protocol on a USB CDC serial endpoint. Each packet is:
 
 ```
 [1 byte command id] [N bytes protobuf body]
@@ -282,44 +266,6 @@ A button's visual depends on the **selected platform tab** (Xbox / PlayStation /
 
 ---
 
-## UI conventions and invariants
-
-These are easy to break inadvertently:
-
-### Backends
-
-- **USB** is a UI-only umbrella that toggles `DINPUT + XINPUT + NINTENDO_SWITCH` together. See `BACKEND_CHOICES`.
-- `PASSTHROUGH_PS4` / `PASSTHROUGH_PS5` are intentionally hidden — not functional on the device yet.
-- Only `USB`, `GAMECUBE`, `N64`, `NES`, `SNES` appear as checkboxes.
-
-### Mode change
-
-- Profile data is preserved across mode changes wherever possible. The `modeId` flip itself only directly modifies `applicableBackends` for keyboard transitions (see above).
-- `preserveOutputsAcrossModeChange()` rewrites `buttonRemapping[].activates` so every button's effective **output** stays the same in the new mode. Explicit disables are left alone. Buttons whose output simply doesn't exist in the new mode get explicitly disabled.
-
-### RGB stripping
-
-- `stripDisabledLeds()` removes `buttonColors[]` entries for buttons in `NO_LED_BUTTONS` (`BTN_MB2`–`BTN_MB7`) before:
-  - `configToBinary()` → device send
-  - `exportConfig()` → JSON download
-- This is a safety net: even imported configs with bad data can't write LED entries to non-existent LEDs.
-
-### Sizes / fonts
-
-- Major Mono Display — logo only
-- Source Sans 3 — body / UI
-- Inconsolata — code-like elements (button identifiers, mode chips, SOCD/remap dropdowns)
-- Base UI font is 15 px; primary buttons are weight 700.
-- Controller `max-width: 984px`; menu buttons are `r=13` user units inside the SVG.
-
-### Profile context menu
-
-Right-clicking a profile in the sidebar opens a small floating menu:
-- **Rename**: swaps the profile-name span for an inline input. Enter to save, Escape to cancel, blur to save.
-- **Duplicate**: deep-clones the profile via `JSON.parse(JSON.stringify(src))`, suffixes the name with " (copy)" (auto-numbered for repeated duplicates), inserts the copy right after the source, and selects it.
-
----
-
 ## Contributing
 
 ### Adding a new game mode
@@ -380,7 +326,7 @@ Most of the app works fine without a Glyph plugged in — load defaults, edit, e
 
 ## Acknowledgements
 
-- [Limit Labs](https://limitlabs.com/) — designers of the Glyph mk6.
+- [Limit Labs](https://limitlabs.com/) — designers of the Glyph hardware and firmware.
 - [JonnyHaystack/HayBox](https://github.com/JonnyHaystack/HayBox) — the controller firmware framework the Glyph is built on.
 - [GregTurbo/HayBox-proto](https://github.com/GregTurbo/HayBox-proto) — the configurator protobuf schema fork the Glyph uses.
 - [eric-wieser/PacketIO](https://github.com/eric-wieser/PacketIO) — the COBS framing library on the firmware side.
