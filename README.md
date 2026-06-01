@@ -17,9 +17,7 @@
 4. [How the app talks to the device](#how-the-app-talks-to-the-device)
 5. [Data model](#data-model)
 6. [Mode system](#mode-system)
-7. [Button layout & rendering](#button-layout--rendering)
-8. [UI conventions and invariants](#ui-conventions-and-invariants)
-9. [Contributing](#contributing)
+7. [Contributing](#contributing)
 
 ---
 
@@ -31,11 +29,10 @@ If you just want to use the app, an always-up-to-date build is hosted at:
 
 > **<https://lyseste.com/glyph-remapper/>**
 
-No install required — open it in a Chromium-based browser and skip to **[Connecting to the device](#connecting-to-the-device)** below.
+Open it in a browser that supports WebSerial and skip to **[Connecting to the device](#connecting-to-the-device)** below.
 
 ### Requirements
 
-- A **Chromium-based browser** (Chrome, Edge, Brave, Arc) — WebSerial is not available in Firefox or Safari yet.
 - WebSerial only works on `https://` origins **or** `http://localhost`. A static file server is fine for local dev.
 
 ### Run locally
@@ -45,31 +42,18 @@ No install required — open it in a Chromium-based browser and skip to **[Conne
 npx serve -p 5500
 ```
 
-Then open <http://localhost:5500/>.
+Then open <http://localhost:5500/>
 
-Any static file server works — `python -m http.server 5500`, the VS Code "Live Server" extension, etc. The only constraint is that the origin needs to be `https://` or `http://localhost` for WebSerial to function.
+Any static file server works e.g. `python -m http.server 5500`, the VS Code "Live Server" extension, etc. The only constraint is that the origin needs to be `https://` or `http://localhost` for WebSerial to function.
 
 ### Connecting to the device
 
-1. Hold **RT2** while plugging the Glyph into USB to put it in Configurator mode.
+1. Hold **RT2** while plugging the Glyph into USB to put it in Configurator mode, or open the Glyph menu and go to configuration.
 2. Click **Connect** in the toolbar and select the Glyph serial port.
 3. **Load Config** reads the current profiles off the device.
-4. Edit, then **Save to Device** writes the new config back. Profiles persist across reboots.
+4. Make your changes, then **Save to Device** writes the new config back to the device.
 
-You can also work entirely offline using the **Config File** ⬇ / ⬆ buttons to export/import JSON. The JSON format is compatible with the official Limit Labs configurator and the firmware's protobuf schema.
-
----
-
-## Features
-
-- **Visual controller layout** that mirrors the Glyph (35 main buttons + 7 menu buttons).
-- **Per-button remapping** through a click-to-assign popup that shows every output the current mode supports.
-- **Three button-display styles** — Xbox, PlayStation, Switch — with proper colors and glyphs. GameCube glyphs auto-enable when the GameCube backend is selected.
-- **Per-profile RGB lighting** — per-button color picker (hex + HSV), default-color fallback, four animation modes (Static / Rainbow Wave / Rainbow Shift / None), and an **Apply to mapped buttons** shortcut.
-- **Keyboard mode** with a click-to-capture key input box that uses real USB HID scancodes.
-- **SOCD pair configuration** (resolves up/down or left/right conflicts).
-- **Profile management** — up to 20 profiles per device.
-- **JSON import/export** for offline editing and backup, fully round-trip safe with the device protobuf.
+You can also work entirely offline using the **Config File** ⬇ / ⬆ buttons to export/import JSON. The JSON format is compatible with the official LimitLabs configurator.
 
 ---
 
@@ -79,7 +63,7 @@ You can also work entirely offline using the **Config File** ⬇ / ⬆ buttons t
 
 1. `PROTO_DEF` — inline protobuf schema (`GregTurbo/HayBox-proto#db4e2f6`)
 2. `BUTTON_LAYOUT` — physical button positions in the controller SVG (viewBox `912 × 491`)
-3. `PLATFORM_STYLES` (Xbox / PS / Switch / GameCube) + `MODE_OUTPUT_MAP` — per-mode mappings
+3. `PLATFORM_STYLES` (Xbox / PS / Switch / GameCube) + `MODE_OUTPUT_MAP` with per-mode mappings
 4. HID keycode tables + keyboard helpers
 5. RGB / LED helpers (`ensureRgbConfig`, `getButtonColor`, `setButtonColor`, `stripDisabledLeds`, …)
 6. Button-remap helpers (`remapMap`, `resolveLogicalButton`, `resolveButtonOutput`, `findPhysicalButtonForOutput`, `preserveOutputsAcrossModeChange`, …)
@@ -88,7 +72,7 @@ You can also work entirely offline using the **Config File** ⬇ / ⬆ buttons t
 9. SVG render loop (`buildControllerSVG`) + `renderButtonIcon` and glyph builders
 10. Popup logic (`openOutputPopup`, `applyOutput`, `unmapSelected`, key-capture, color controls)
 11. Sidebar + settings panel rendering and event wiring
-12. `DEFAULT_CONFIG_JSON` — embedded "Load Defaults" payload, mirrors the official Limit Labs default profile set
+12. `DEFAULT_CONFIG_JSON` with an embedded "Load Defaults" payload, mirrors the official Limit Labs default profile set
 13. `DOMContentLoaded` boot
 
 ---
@@ -225,44 +209,6 @@ This is why **`preserveOutputsAcrossModeChange()`** exists — when the mode cha
 - `Escape` cancels capture without binding (so the user can always escape the capture state).
 - The firmware bypasses `buttonRemapping` (see `CustomKeyboardMode.cpp`); the host follows the same convention.
 - Backends section is hidden because **only the DInput backend emits HID keyboard reports**. Switching into keyboard mode forces `applicableBackends = ['COMMS_BACKEND_DINPUT']`; switching out restores the USB triplet. Non-keyboard ↔ non-keyboard transitions don't touch the backend list.
-
----
-
-## Button layout & rendering
-
-`BUTTON_LAYOUT` is a flat array of 42 button descriptors:
-
-```js
-{ id: 'BTN_LF1', x: 257.22, y: 154.33, r: 29.30, label: 'LF1' }
-```
-
-Coordinates are in user units against the controller SVG's `viewBox="0 0 912 491"`. The SVG is rendered at runtime in `buildControllerSVG()`:
-
-```
-<g class="btn-group btn-menu? btn-large? mapped|unmapped selected?" data-btn="BTN_X">
-  <circle .btn-ring>        ← outer cyan/colored accent ring (mapped buttons only)
-  <circle .btn-fill>        ← gray base (#707070 unmapped, #404040 mapped)
-  <circle .btn-icon-disk>   ← platform-colored disk (mapped buttons)
-  <image  .btn-icon-svg>    ← Kenney glyph (if available for this platform+output)
-  |  <text .btn-icon-label> ← text label fallback
-  |  <line> × 3              ← arrow for d-pad / stick directions
-  |  <g>                     ← PS face-button outline (cross / circle / square / triangle)
-</g>
-```
-
-### LED ring color
-
-The ring's stroke color reads from the CSS custom property `--led-color` set inline on the `.btn-group`:
-
-```css
-.btn-ring { stroke: var(--led-color, var(--btn-mapped-stroke)); }
-```
-
-`buildControllerSVG()` sets `g.style.setProperty('--led-color', '#ff8800')` per button. `applyLiveButtonColor(btnId, colorInt)` updates a single button's ring without rebuilding the whole SVG — used by the popup's color picker so the controller reflects the picked color in real time.
-
-### Platform styles
-
-A button's visual depends on the **selected platform tab** (Xbox / PlayStation / Switch / GameCube) and the **output id** (`a`, `b`, `x`, `y`, `dup`, `rb`, `lt_light`, …). Lookup goes through `PLATFORM_STYLES[selectedPlatform][outputId]`. PlayStation face buttons use SVG outline shapes (cross / circle / square / triangle); GameCube buttons use Kenney icons; everything else is text labels with platform coloring.
 
 ---
 
