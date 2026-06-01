@@ -125,8 +125,17 @@
             <div class="rgb-color-row">
               <button type="button" id="set-rgb-color-swatch" class="rgb-color-swatch" aria-label="Open color picker" style="background:#22d3ee"></button>
               <input type="text" id="set-rgb-color-hex" class="rgb-color-hex setting-input" value="#22d3ee" maxlength="7" spellcheck="false" aria-label="Static color hex">
+              <button type="button" id="btn-save-color" class="rgb-save-color" title="Save this color to the palette" aria-label="Save color">+</button>
             </div>
-            <button type="button" id="btn-apply-rgb" class="btn btn-small">Apply to mapped buttons</button>
+            <button type="button" id="btn-apply-rgb-static" class="btn btn-small rgb-apply-btn">Apply to mapped buttons</button>
+            <div id="panel-saved-colors" class="saved-colors" hidden></div>
+          </div>
+          <div id="rgb-rainbow-controls" class="rgb-rainbow-controls" hidden>
+            <label class="rgb-speed-row">
+              <span class="rgb-speed-label">Speed</span>
+              <input type="range" id="set-rgb-speed" class="rgb-speed-slider" min="0" max="4" step="1" value="2" aria-label="Rainbow animation speed">
+            </label>
+            <button type="button" id="btn-apply-rgb-rainbow" class="btn btn-small rgb-apply-btn">Apply to mapped buttons</button>
           </div>
         </div>
         <div class="setting-group setting-group-collapsible" id="remap-group">
@@ -160,20 +169,35 @@
     <div id="output-popup-grid" class="output-popup-grid"></div>
     <div id="output-popup-keyboard" class="output-popup-keyboard" hidden>
       <button type="button" id="popup-keyboard-input" class="popup-keyboard-input">Click then press a key</button>
+      <button type="button" id="popup-keyboard-esc" class="popup-keyboard-esc" title="Assign Escape key">Assign Esc</button>
       <div class="output-popup-hint">Captures one HID key per button. Bypasses Button Remapping in keyboard mode.</div>
     </div>
+    <button id="output-popup-unmap" class="output-popup-unmap">UNBIND</button>
     <div id="output-popup-color" class="output-popup-color">
       <button type="button" id="popup-color-swatch" class="popup-color-swatch" aria-label="Open color picker" style="background:#22d3ee"></button>
       <input type="text" id="popup-color-hex" class="popup-color-hex" value="#22d3ee" maxlength="7" spellcheck="false" aria-label="LED hex color">
+      <button type="button" id="popup-save-color" class="popup-save-color" title="Save this color to the palette" aria-label="Save color">+</button>
       <button type="button" id="popup-remove-lighting" class="popup-remove-lighting" title="Turn LED off for this button" aria-label="Turn LED off">⊘</button>
     </div>
-    <button id="output-popup-unmap" class="output-popup-unmap">UNBIND</button>
+    <div id="output-popup-rainbow" class="output-popup-rainbow" hidden>
+      <button type="button" id="popup-rainbow-on" class="popup-rainbow-on" title="Include this button in the rainbow animation" aria-label="Include in rainbow"></button>
+      <button type="button" id="popup-rainbow-off" class="popup-rainbow-off" title="Turn LED off for this button during the animation" aria-label="Turn LED off">⊘</button>
+    </div>
+    <div id="popup-saved-colors" class="saved-colors" hidden></div>
   </div>
+
+  <!-- Floating tooltip used by controller buttons (custom-styled) -->
+  <div id="btn-tooltip" class="btn-tooltip hidden" role="tooltip" aria-hidden="true"></div>
 
   <!-- Profile right-click context menu (floating) -->
   <div id="profile-context-menu" class="context-menu hidden" role="menu">
     <button type="button" data-action="rename" role="menuitem">Rename</button>
     <button type="button" data-action="duplicate" role="menuitem">Duplicate</button>
+  </div>
+
+  <!-- Saved-color right-click context menu (floating) -->
+  <div id="saved-color-menu" class="context-menu hidden" role="menu">
+    <button type="button" data-action="remove" role="menuitem">Remove color</button>
   </div>
 
   <!-- Help modal -->
@@ -194,14 +218,23 @@
         <h3>Editing Profiles</h3>
         <ul>
           <li>Click a button on the controller layout to assign or remap it.</li>
-          <li>Use the right panel to edit mode, backends, SOCD rules, and layout.</li>
-          <li>Buttons outlined in <span style="color:#22d3ee">cyan</span> are active (mapped) in the profile.</li>
-          <li>Plain dark grey buttons are unmapped (disabled) in the profile.</li>
+          <li>Use the right panel to edit mode, backends, SOCD rules, and lighting.</li>
+          <li>A colored outline around a button indicates it is active (mapped) in the profile. The outline color reflects the LED color set for that button in <strong>Button Lighting</strong>.</li>
+          <li>Plain dark gray buttons are unmapped (disabled) in the profile.</li>
           <li>Switch <strong>Button Display Style</strong> (Xbox / PlayStation / Switch) below the controller to change how the mapped buttons are labelled.</li>
+          <li>Right-click a profile in the sidebar to <strong>Rename</strong> or <strong>Duplicate</strong> it.</li>
         </ul>
         <h3>Config Files</h3>
         <p>Use <strong>Export JSON</strong> / <strong>Import JSON</strong> to save and restore configs offline.</p>
         <p>The JSON format is compatible with the official Glyph Configurator.</p>
+      </div>
+      <div class="help-footer">
+        <a class="help-github" href="https://github.com/lyseste/glyph-remapper" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true">
+            <path fill="currentColor" fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+          </svg>
+          <span>View source on GitHub</span>
+        </a>
       </div>
     </div>
   </div>
