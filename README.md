@@ -68,7 +68,7 @@ You can also work entirely offline using the **Config File** ⬇ / ⬆ buttons t
 - **Per-profile RGB lighting** — per-button color picker (hex + HSV), default-color fallback, four animation modes (Static / Rainbow Wave / Rainbow Shift / None), and an **Apply to mapped buttons** shortcut.
 - **Keyboard mode** with a click-to-capture key input box that uses real USB HID scancodes.
 - **SOCD pair configuration** (resolves up/down or left/right conflicts).
-- **Profile management** — drag-add, right-click rename, right-click duplicate, delete; up to 20 profiles per device.
+- **Profile management** — up to 20 profiles per device.
 - **JSON import/export** for offline editing and backup, fully round-trip safe with the device protobuf.
 
 ---
