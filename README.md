@@ -6,8 +6,7 @@
   A browser-based configurator for the <strong>Glyph</strong> leverless game controller by <a href="https://limitlabs.com/">Limit Labs</a>. <br>
   Edit profiles, customize per-button RGB, configure SOCD, and flash configs to the device over WebSerial.
 </p>
-
----
+<br/>
 
 ## Table of contents
 
