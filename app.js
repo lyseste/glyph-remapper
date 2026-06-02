@@ -540,7 +540,13 @@ const POPUP_NEUTRAL_BG = '#2F2F2F'; // popup glyph base (lighter than popup card
 const LIGHT_TEXT = '#f5f5f5';
 
 function mkFace(label, bg, fg = '#fff') { return { label, bg, fg, kind: 'face' }; }
-function mkFaceGlyph(glyph, color) { return { glyph, bg: DARK_BG, fg: color, kind: 'face' }; }
+// PS face buttons render as SVG glyph shapes (cross / circle / square /
+// triangle), so the `label` field is only used for text contexts —
+// tooltips, the remap-list dropdown, outputDropdownLabel. Without it those
+// contexts would fall through to the raw output id ('a', 'b', …) and show
+// lowercase text. Pass the same uppercase letter the Xbox / Switch styles
+// use for consistency.
+function mkFaceGlyph(glyph, color, label) { return { label, glyph, bg: DARK_BG, fg: color, kind: 'face' }; }
 function mkShoulder(label) { return { label, bg: DARK_BG, fg: LIGHT_TEXT, kind: 'shoulder' }; }
 function mkSystem(label) { return { label, bg: DARK_BG, fg: LIGHT_TEXT, kind: 'system' }; }
 function mkDpad(dir) { return { label: dir, bg: DARK_BG, fg: LIGHT_TEXT, kind: 'dpad' }; }
@@ -571,10 +577,10 @@ const XBOX_STYLE = {
 // Xbox A (bottom) → Cross, B (right) → Circle, X (left) → Square, Y (top) → Triangle.
 // Each glyph renders as an outlined SVG shape in its canonical color on a dark bg.
 const PS_STYLE = {
-  a: mkFaceGlyph('cross',    '#7DB3E9'),   // Cross (blue)
-  b: mkFaceGlyph('circle',   '#FF6666'),   // Circle (red)
-  x: mkFaceGlyph('square',   '#FF69F8'),   // Square (pink)
-  y: mkFaceGlyph('triangle', '#3EE3A1'),   // Triangle (green)
+  a: mkFaceGlyph('cross',    '#7DB3E9', 'A'),   // Cross (blue)
+  b: mkFaceGlyph('circle',   '#FF6666', 'B'),   // Circle (red)
+  x: mkFaceGlyph('square',   '#FF69F8', 'X'),   // Square (pink)
+  y: mkFaceGlyph('triangle', '#3EE3A1', 'Y'),   // Triangle (green)
   lb: mkShoulder('L1'), rb: mkShoulder('R1'),
   lt: mkShoulder('L2'), rt: mkShoulder('R2'),
   ls: mkShoulder('L3'), rs: mkShoulder('R3'),
@@ -589,13 +595,17 @@ const PS_STYLE = {
   rt_light: mkShoulder('Lt'), rt_mid: mkShoulder('Md'),
 };
 
-// Switch: A/B and X/Y are swapped relative to Xbox.
-// Xbox A (bottom) → Switch B, B (right) → Switch A, X (left) → Switch Y, Y (top) → Switch X.
+// Switch: labels match the firmware's actual behavior (1:1 from OutputState
+// to the Switch HID report — see NintendoSwitchBackend::SendReport). The
+// firmware does NOT swap A↔B / X↔Y between backends; whatever fires
+// outputs.a becomes Switch A regardless of which backend is active. The
+// Switch tab previously showed swapped labels assuming a flip the firmware
+// doesn't perform, which made the labels lie. Honest labels now.
 const SWITCH_STYLE = {
-  a: mkFace('B', DARK_BG, LIGHT_TEXT),
-  b: mkFace('A', DARK_BG, LIGHT_TEXT),
-  x: mkFace('Y', DARK_BG, LIGHT_TEXT),
-  y: mkFace('X', DARK_BG, LIGHT_TEXT),
+  a: mkFace('A', DARK_BG, LIGHT_TEXT),
+  b: mkFace('B', DARK_BG, LIGHT_TEXT),
+  x: mkFace('X', DARK_BG, LIGHT_TEXT),
+  y: mkFace('Y', DARK_BG, LIGHT_TEXT),
   lb: mkShoulder('L'),  rb: mkShoulder('R'),
   lt: mkShoulder('ZL'), rt: mkShoulder('ZR'),
   ls: mkShoulder('LS'), rs: mkShoulder('RS'),
@@ -1339,7 +1349,9 @@ function makeBlankCustomConfig() {
     stickDirectionMappings: [],
     analogTriggerMappings: [],
     modifiers: [],
-    stickRange: 80,
+    // 100 = full XInput / Switch range. Users targeting Melee can drop this
+    // to 80, but full range is the more common starting point.
+    stickRange: 100,
     buttonComboMappings: [],
   };
 }
@@ -2384,7 +2396,7 @@ function renderCustomModeSection(profile) {
   const cc = ensureCustomConfig(profile);
   if (!cc) return;
   // Coerce undefined/0 to the Melee default so the input shows something sane.
-  $('set-custom-stick-range').value = String(cc.stickRange || 80);
+  $('set-custom-stick-range').value = String(cc.stickRange || 100);
   renderCustomModifierList(profile, cc);
   renderCustomTriggerList(profile, cc);
 }

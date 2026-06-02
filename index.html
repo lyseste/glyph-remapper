@@ -106,7 +106,11 @@
           <label class="setting-label">Mode</label>
           <select id="set-mode-id" class="setting-select"></select>
         </div>
-        <div class="setting-group">
+        <div class="setting-group" hidden>
+          <!-- Profile name is editable from the left-sidebar context menu
+               (right-click a profile entry → Rename), so this duplicate
+               in-panel input is hidden. The set-name input still exists in
+               the DOM because renderSettingsPanel writes to it. -->
           <label class="setting-label">Name</label>
           <input type="text" id="set-name" class="setting-input" placeholder="Profile name">
         </div>
