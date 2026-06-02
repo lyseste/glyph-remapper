@@ -466,7 +466,7 @@ const ANALOG_AXES = [
 
 // Multiplier that produces no change under both COMBINATION_MODE_OVERRIDE and
 // COMBINATION_MODE_COMPOUND. The user starts with this and edits down/up.
-const MODIFIER_NO_CHANGE_MULTIPLIER = 1.0;
+const MODIFIER_DEFAULT_MULTIPLIER = 0;
 // Trigger value that represents a full digital press, matching what
 // triggerLDigital → triggerLAnalog produces. Used as the default for new
 // AnalogTriggerMapping entries.
@@ -523,7 +523,7 @@ function modifierGroups(cc) {
       };
       byKey.set(key, g);
     }
-    if (m.axis) g.axes[m.axis] = (m.multiplier != null ? Number(m.multiplier) : 1.0);
+    if (m.axis) g.axes[m.axis] = (m.multiplier != null ? Number(m.multiplier) : 0);
     g.entries.push(m);
   }
   return [...byKey.values()];
@@ -1728,6 +1728,12 @@ function resolveButtonOutput(physBtnId, profile, rmap) {
   //      every controller mode, so showing the icon here reflects what the
   //      device actually emits.
   if (physBtnId.startsWith('BTN_MB')) {
+    // Custom mode: menuButtonIcon is purely cosmetic (OLED display) and has no
+    // effect on actual firmware output. MB buttons only produce output when
+    // explicitly assigned in digitalButtonMappings, so skip both the icon and
+    // firmware-defaults paths and check the custom config directly.
+    if (isCustomProfile(profile)) return resolveCustomButtonOutput(physBtnId, profile);
+
     const mbIdx = parseInt(physBtnId.slice(6), 10) - 1;
     const outOpt = profile.menuButtonIcon?.[mbIdx];
     if (outOpt && outOpt !== 'OUT_UNSPECIFIED') {
@@ -3549,8 +3555,18 @@ function applyOutput(outputId) {
 
   const wasBound = buttonHasBinding(profile, selectedBtnId);
 
-  // Menu buttons: write to menuButtonIcon
+  // Menu buttons: write to menuButtonIcon (or digitalButtonMappings in CUSTOM mode)
   if (selectedBtnId.startsWith('BTN_MB')) {
+    if (isCustomProfile(profile)) {
+      // Custom mode: menuButtonIcon is cosmetic only (OLED display icon). MB buttons
+      // only produce firmware output when explicitly placed in digitalButtonMappings,
+      // so route the assignment there — same path as any other button in custom mode.
+      setCustomButtonOutput(profile, selectedBtnId, outputId);
+      autoEnableLedOnAssign(profile, selectedBtnId, wasBound);
+      closeOutputPopup();
+      renderAll();
+      return;
+    }
     const mbIdx = parseInt(selectedBtnId.slice(6), 10) - 1;
     if (!profile.menuButtonIcon) profile.menuButtonIcon = emptyMenuIconArray();
     profile.menuButtonIcon[mbIdx] = OUTPUT_ID_TO_OUTPUT_OPTION[outputId] || 'OUT_UNSPECIFIED';
@@ -3590,9 +3606,14 @@ function unmapSelected() {
     // Keyboard mode: clear the keycode for this physical button.
     setButtonKeycode(profile, selectedBtnId, null);
   } else if (selectedBtnId.startsWith('BTN_MB')) {
-    const mbIdx = parseInt(selectedBtnId.slice(6), 10) - 1;
-    if (!profile.menuButtonIcon) profile.menuButtonIcon = emptyMenuIconArray();
-    profile.menuButtonIcon[mbIdx] = 'OUT_UNSPECIFIED';
+    if (isCustomProfile(profile)) {
+      // Custom mode: assignment lives in digitalButtonMappings, not menuButtonIcon.
+      clearCustomButtonBinding(profile, selectedBtnId);
+    } else {
+      const mbIdx = parseInt(selectedBtnId.slice(6), 10) - 1;
+      if (!profile.menuButtonIcon) profile.menuButtonIcon = emptyMenuIconArray();
+      profile.menuButtonIcon[mbIdx] = 'OUT_UNSPECIFIED';
+    }
   } else if (isCustomProfile(profile)) {
     // CUSTOM mode: clear this physical button from any custom-mode slot it
     // currently occupies (digital output or stick direction).
@@ -3839,10 +3860,10 @@ function wireSettingsHandlers() {
   });
 
   // Custom mode: add a new M-group. Materialise one AnalogModifier entry per
-  // stick axis with multiplier = 1.0 (no-op for both Override and Compound
-  // modes) so the inputs start visibly populated with "no change" defaults.
-  // The user edits them down or up. Empty `buttons` means the modifier never
-  // fires until the user binds a phys via the popup grid (firmware's
+  // stick axis with multiplier = 0 (safe default: forces the axis to neutral
+  // when the modifier is held, for both Override and Compound modes). The user
+  // edits values from here. Empty `buttons` means the modifier never fires
+  // until the user binds a phys via the popup grid (firmware's
   // all_buttons_held returns false on mask=0).
   $('btn-add-custom-modifier').addEventListener('click', () => {
     const p = currentProfile();
@@ -3853,7 +3874,7 @@ function wireSettingsHandlers() {
       cc.modifiers.push({
         buttons: [],
         axis: axis.value,
-        multiplier: MODIFIER_NO_CHANGE_MULTIPLIER,
+        multiplier: MODIFIER_DEFAULT_MULTIPLIER,
         combinationMode: 'COMBINATION_MODE_OVERRIDE',
       });
     }
