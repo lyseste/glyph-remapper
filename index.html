@@ -87,6 +87,7 @@
           <button class="platform-tab" data-platform="playstation">PlayStation</button>
           <button class="platform-tab" data-platform="switch">Switch</button>
           <button class="platform-tab platform-tab-gc hidden" data-platform="gamecube">GameCube</button>
+          <button class="platform-tab platform-tab-n64 hidden" data-platform="n64">64</button>
         </div>
       </div>
       <div id="no-profile-msg" class="no-profile-msg">
@@ -137,6 +138,19 @@
             </label>
             <button type="button" id="btn-apply-rgb-rainbow" class="btn btn-small rgb-apply-btn">Apply to mapped buttons</button>
           </div>
+        </div>
+        <div class="setting-group" id="custom-group" hidden>
+          <label class="setting-label">Custom Mode</label>
+          <div class="custom-stick-range-row">
+            <span class="custom-stick-range-label">Stick range</span>
+            <input type="number" id="set-custom-stick-range" class="setting-input custom-stick-range-input" value="80" min="0" max="127">
+          </div>
+          <label class="setting-label setting-sublabel">Modifiers</label>
+          <div id="custom-modifiers-list" class="custom-modifiers-list"></div>
+          <button type="button" id="btn-add-custom-modifier" class="btn btn-small">+ Add Modifier</button>
+          <label class="setting-label setting-sublabel">Analog Triggers</label>
+          <div id="custom-triggers-list" class="custom-modifiers-list"></div>
+          <button type="button" id="btn-add-custom-trigger" class="btn btn-small">+ Add Trigger</button>
         </div>
         <div class="setting-group setting-group-collapsible" id="remap-group">
           <button type="button" id="remap-toggle" class="setting-collapse-toggle" aria-expanded="false" aria-controls="remap-body">

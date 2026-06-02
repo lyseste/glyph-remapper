@@ -825,6 +825,284 @@ html, body {
   overflow: hidden;
 }
 
+/* ============================================================
+   Custom mode panel (per-profile modifiers + stick range)
+   ============================================================ */
+.setting-sublabel {
+  font-size: 11px;
+  margin-top: 12px;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
+.custom-stick-range-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.custom-stick-range-label {
+  font-size: 13px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.custom-stick-range-input {
+  width: 72px;
+  text-align: right;
+  font-family: 'Inconsolata', 'Consolas', monospace;
+  /* Hide the native up/down spinner buttons — they don't fit our visual style
+     and the field accepts direct keyboard input fine without them. */
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.custom-stick-range-input::-webkit-inner-spin-button,
+.custom-stick-range-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
+.custom-modifiers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.custom-modifier-row {
+  border: 1px solid var(--border-light);
+  border-radius: 7px;
+  background: var(--bg-input);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+}
+/* M-group / T-entry header — "M1 → LT1 [▾]". Reserve room on the right for
+   the absolutely-positioned ✕ remove button so the bind dropdown's flex:1
+   doesn't overlap it. */
+.custom-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding-right: 26px;
+}
+.custom-group-name {
+  font-family: 'Inconsolata', 'Consolas', monospace;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+.custom-group-bound {
+  color: var(--text-dim);
+  font-family: 'Inconsolata', 'Consolas', monospace;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* In-row physical-button picker for the M-group / T-entry header. Matches
+   the field inputs in the body of the row for visual consistency. */
+.custom-group-bind {
+  box-sizing: border-box;
+  height: 26px;
+  padding: 2px 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: 'Inconsolata', 'Consolas', monospace;
+  font-size: 12px;
+  flex: 1;
+  min-width: 0;
+  outline: none;
+  cursor: pointer;
+}
+.custom-group-bind:focus {
+  border-color: var(--accent-dim);
+}
+
+/* Match the dim-chevron arrow used by the SOCD and Mode/Lighting selects
+   elsewhere in the app, so all dropdowns look consistent. Covers every
+   <select> inside a modifier/trigger row (bind picker, mode dropdown,
+   trigger LT/RT dropdown). */
+.custom-group-bind,
+.custom-modifier-field select,
+.custom-modifier-mode-row select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  background-size: 9px 6px;
+  padding-right: 20px;
+}
+
+/* Per-axis multiplier inputs for an M-group — 3 columns × 2 rows. */
+.custom-modifier-axes {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.custom-modifier-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.custom-modifier-mode-row label {
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.custom-modifier-mode-row select {
+  flex: 1;
+  /* padding-right reserves space for the dim-chevron applied via the shared
+     select-arrow rule earlier in the file. */
+  padding: 4px 20px 4px 6px;
+  /* Use background-color (not background shorthand) so the dim-chevron
+     background-image from the shared rule above isn't reset to none. */
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.custom-modifier-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.custom-modifier-when {
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.06em;
+  margin-right: 2px;
+}
+.custom-modifier-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px 2px 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  font-family: 'Inconsolata', 'Consolas', monospace;
+  font-size: 12px;
+  font-weight: 600;
+}
+.custom-modifier-chip-x {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 12px;
+  line-height: 1;
+}
+.custom-modifier-chip-x:hover {
+  color: var(--danger);
+}
+.custom-modifier-add-btn {
+  background: transparent;
+  border: 1px dashed var(--border-light);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  cursor: pointer;
+}
+.custom-modifier-add-btn:hover {
+  color: var(--text);
+  border-color: var(--accent-dim);
+}
+.custom-modifier-add-select {
+  font-family: inherit;
+  font-size: 11px;
+  padding: 2px 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  color: var(--text);
+}
+.custom-modifier-settings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.custom-modifier-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.custom-modifier-field label {
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.custom-modifier-field select,
+.custom-modifier-field input {
+  /* Box-sizing + explicit height so number inputs (which the browser may
+     pad differently for the spinners) match select control heights exactly. */
+  box-sizing: border-box;
+  height: 26px;
+  padding: 4px 6px;
+  /* background-color (not the shorthand) so the chevron background-image set
+     by the shared select-arrow rule earlier in the file is preserved. */
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+}
+/* Selects (not inputs) need extra right-padding so their label text doesn't
+   slide under the chevron. */
+.custom-modifier-field select {
+  padding-right: 20px;
+}
+.custom-modifier-field input {
+  font-family: 'Inconsolata', 'Consolas', monospace;
+  /* Hide the native up/down spinner buttons on number inputs — they don't
+     match our visual style and the field accepts typed values fine. */
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.custom-modifier-field input::-webkit-inner-spin-button,
+.custom-modifier-field input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+.custom-modifier-remove {
+  position: absolute;
+  /* top:12 vertically aligns the ✕ with the bind dropdown's center (dropdown
+     sits at row-top + 8 padding + 13 half-height = 21; ✕ is 18px tall so
+     top = 21 - 9 = 12). */
+  top: 12px;
+  right: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: 14px;
+  line-height: 1;
+}
+.custom-modifier-remove:hover {
+  color: var(--danger);
+}
+
 /* In keyboard-mode SOCD rows the button selects can be narrow (3-4 char ids)
    so they yield room to the SOCD-type select, which holds longer enum names. */
 .socd-item .socd-dir {
@@ -845,6 +1123,28 @@ html, body {
   color: var(--text-dim);
   flex-shrink: 0;
   padding: 0 2px;
+}
+
+/* Keyboard-mode remap row: the right side is a clickable keycode label
+   (delegates to the assign popup's key-capture flow) rather than a select. */
+.remap-keycode-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 5px;
+  color: var(--text);
+  font-family: 'Inconsolata', 'Consolas', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+.remap-keycode-btn:hover {
+  border-color: var(--accent-dim);
+  background: var(--bg-hover);
 }
 
 /* Axis label for the predefined SOCD rows (Left X / Left Y / Right X / Right Y).

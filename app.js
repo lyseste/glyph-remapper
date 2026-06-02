@@ -293,6 +293,12 @@ function preserveOutputsAcrossModeChange(profile, oldMode, newMode) {
   // Keyboard mode bypasses buttonRemapping entirely (CustomKeyboardMode.cpp),
   // so there's nothing meaningful to convert across a keyboard transition.
   if (oldMode === 'MODE_KEYBOARD' || newMode === 'MODE_KEYBOARD') return;
+  // CUSTOM mode uses its own mapping table (CustomModeConfig.digitalButton-
+  // Mappings) instead of MODE_OUTPUT_MAP, so output-preservation across the
+  // boundary is meaningless — the new mode has no mode map to look outputs up
+  // in. Without this skip, every button gets explicitly disabled because no
+  // output id "exists" in CUSTOM's empty mode map.
+  if (oldMode === 'MODE_CUSTOM' || newMode === 'MODE_CUSTOM') return;
 
   const oldModeMap = MODE_OUTPUT_MAP[oldMode] || {};
   const newModeMap = MODE_OUTPUT_MAP[newMode] || {};
@@ -390,6 +396,138 @@ const OUTPUT_OPTION_TO_OUTPUT_ID = {
   OUT_PLUS: 'start', OUT_MINUS: 'select', OUT_MENU: 'start',
   OUT_L: 'lb', OUT_R: 'rb', OUT_Z: 'rb', OUT_ZL: 'lt', OUT_ZR: 'rt',
 };
+
+// DigitalOutput proto enum index (1-based) → internal output id.
+// Used by CustomControllerMode: digitalButtonMappings[i] holds the physical
+// button that activates DigitalOutput value (i+1). Indices in this array
+// correspond to (proto enum value - 1).
+const DIGITAL_OUTPUT_TO_OUTPUT_ID = [
+  'a',       // GP_A = 1
+  'b',       // GP_B = 2
+  'x',       // GP_X = 3
+  'y',       // GP_Y = 4
+  'lb',      // GP_LB = 5
+  'rb',      // GP_RB = 6
+  'lt',      // GP_LT = 7
+  'rt',      // GP_RT = 8
+  'start',   // GP_START = 9
+  'select',  // GP_SELECT = 10
+  'home',    // GP_HOME = 11
+  'capture', // GP_CAPTURE = 12
+  'dup',     // GP_DPAD_UP = 13
+  'ddown',   // GP_DPAD_DOWN = 14
+  'dleft',   // GP_DPAD_LEFT = 15
+  'dright',  // GP_DPAD_RIGHT = 16
+  'ls',      // GP_LSTICK_CLICK = 17
+  'rs',      // GP_RSTICK_CLICK = 18
+];
+
+// StickDirectionButton proto enum index (1-based) → internal output id.
+// stickDirectionMappings[i] = the physical button that activates
+// StickDirectionButton value (i+1). Right stick maps to 'cs*' (c-stick) to
+// match the existing naming convention.
+const STICK_DIR_TO_OUTPUT_ID = [
+  'lsu',     // SD_LSTICK_UP = 1
+  'lsd',     // SD_LSTICK_DOWN = 2
+  'lsl',     // SD_LSTICK_LEFT = 3
+  'lsr',     // SD_LSTICK_RIGHT = 4
+  'csu',     // SD_RSTICK_UP = 5
+  'csd',     // SD_RSTICK_DOWN = 6
+  'csl',     // SD_RSTICK_LEFT = 7
+  'csr',     // SD_RSTICK_RIGHT = 8
+];
+
+// Reverse lookups for CUSTOM mode writes: given an output id, where do we
+// store the physical-button binding in the CustomModeConfig?
+const OUTPUT_ID_TO_DIGITAL_INDEX = {};
+const OUTPUT_ID_TO_STICK_INDEX = {};
+DIGITAL_OUTPUT_TO_OUTPUT_ID.forEach((id, i) => { OUTPUT_ID_TO_DIGITAL_INDEX[id] = i; });
+STICK_DIR_TO_OUTPUT_ID.forEach((id, i) => { OUTPUT_ID_TO_STICK_INDEX[id] = i; });
+
+// Set of output ids that CUSTOM mode firmware can drive. Everything else
+// ('mx', 'my', 'rt_light', 'rt_mid') is mode-specific and has no place in the
+// generic CustomControllerMode.
+const CUSTOM_MODE_OUTPUTS = new Set([
+  ...DIGITAL_OUTPUT_TO_OUTPUT_ID,
+  ...STICK_DIR_TO_OUTPUT_ID,
+]);
+
+// AnalogAxis proto enum values. Triggers are excluded from the modifier UI
+// because the firmware's digital-trigger force-override (triggerLDigital → 255
+// at the end of UpdateAnalogOutputs) clobbers anything a modifier sets on the
+// trigger axes; for partial-press values use AnalogTriggerMapping (T-entries)
+// instead.
+const ANALOG_AXES = [
+  { value: 'AXIS_LSTICK_X',  label: 'L-Stick X' },
+  { value: 'AXIS_LSTICK_Y',  label: 'L-Stick Y' },
+  { value: 'AXIS_RSTICK_X',  label: 'R-Stick X' },
+  { value: 'AXIS_RSTICK_Y',  label: 'R-Stick Y' },
+];
+
+// Multiplier that produces no change under both COMBINATION_MODE_OVERRIDE and
+// COMBINATION_MODE_COMPOUND. The user starts with this and edits down/up.
+const MODIFIER_NO_CHANGE_MULTIPLIER = 1.0;
+// Trigger value that represents a full digital press, matching what
+// triggerLDigital → triggerLAnalog produces. Used as the default for new
+// AnalogTriggerMapping entries.
+const TRIGGER_FULL_PRESS_VALUE = 255;
+
+// ModifierCombinationMode proto enum values.
+const MOD_COMBINATION_MODES = [
+  { value: 'COMBINATION_MODE_OVERRIDE', label: 'Override' },
+  { value: 'COMBINATION_MODE_COMPOUND', label: 'Compound' },
+];
+
+// AnalogTrigger proto enum values for trigger mapping rows.
+const ANALOG_TRIGGERS = [
+  { value: 'TRIGGER_LT', label: 'LT (Left)' },
+  { value: 'TRIGGER_RT', label: 'RT (Right)' },
+];
+
+// Virtual outputs that only exist in CUSTOM mode. M{n} = analog modifier
+// group, T{n} = analog trigger mapping. These appear in the popup grid so
+// the user can bind a physical button to a modifier or trigger the same way
+// they'd bind it to a digital output.
+const MODIFIER_OUTPUT_PREFIX = 'mod:';
+const TRIGGER_OUTPUT_PREFIX  = 'trig:';
+function modifierOutputId(groupIdx) { return MODIFIER_OUTPUT_PREFIX + groupIdx; }
+function triggerOutputId(idx)       { return TRIGGER_OUTPUT_PREFIX  + idx;      }
+function isModifierOutputId(id) { return typeof id === 'string' && id.startsWith(MODIFIER_OUTPUT_PREFIX); }
+function isTriggerOutputId(id)  { return typeof id === 'string' && id.startsWith(TRIGGER_OUTPUT_PREFIX);  }
+function parseGroupIdx(outputId) { return parseInt(outputId.slice(outputId.indexOf(':') + 1), 10); }
+
+// Stable, deterministic key for an AnalogModifier's `buttons` array.
+// Used to group modifier entries that share the same activation condition
+// into a single M-group in the UI.
+function modifierGroupKey(buttons) {
+  if (!Array.isArray(buttons) || buttons.length === 0) return '';
+  return [...buttons].sort().join('|');
+}
+
+// Walk customConfig.modifiers and group entries by their `buttons` array.
+// Returns [{ key, buttons, axes: { AXIS_*: multiplier }, combinationMode, entries: [proto refs] }].
+// First-appearance order in the modifier array determines M-group numbering.
+function modifierGroups(cc) {
+  if (!cc || !Array.isArray(cc.modifiers)) return [];
+  const byKey = new Map();
+  for (const m of cc.modifiers) {
+    const key = modifierGroupKey(m.buttons);
+    let g = byKey.get(key);
+    if (!g) {
+      g = {
+        key,
+        buttons: Array.isArray(m.buttons) ? [...m.buttons] : [],
+        axes: {},
+        combinationMode: m.combinationMode || 'COMBINATION_MODE_OVERRIDE',
+        entries: [],
+      };
+      byKey.set(key, g);
+    }
+    if (m.axis) g.axes[m.axis] = (m.multiplier != null ? Number(m.multiplier) : 1.0);
+    g.entries.push(m);
+  }
+  return [...byKey.values()];
+}
 
 // ---------------------------------------------------------------------------
 // Platform display styles
@@ -492,11 +630,39 @@ const GC_STYLE = {
   rt_light: mkShoulder('Lt'), rt_mid: mkShoulder('Md'),
 };
 
+// Nintendo 64: A blue, B green, C-buttons yellow-tinted. Z reuses GameCube's
+// 'Z' shoulder; L/R borrow the Switch-style single-letter shoulder labels.
+// No LB on the N64 controller, so 'lb' is intentionally omitted.
+const N64_STYLE = {
+  a: mkFace('A', '#3851a0'),                   // N64 A button (blue)
+  b: mkFace('B', '#2f9e44'),                   // N64 B button (green)
+  // X/Y aren't on the N64 controller but kept for cross-mode safety so any
+  // mode that emits them still has a glyph to render.
+  x: mkFace('X', DARK_BG, LIGHT_TEXT),
+  y: mkFace('Y', DARK_BG, LIGHT_TEXT),
+  rb: mkShoulder('Z'),                          // mirrors GC_STYLE.rb
+  lt: mkShoulder('L'),                          // mirrors SWITCH_STYLE.lb
+  rt: mkShoulder('R'),                          // mirrors SWITCH_STYLE.rb
+  ls: mkShoulder('L3'), rs: mkShoulder('R3'),
+  start: mkSystem('START'), select: mkSystem('—'),
+  home: mkSystem('⌂'), capture: mkSystem('◉'),
+  dup: mkDpad('↑'), ddown: mkDpad('↓'), dleft: mkDpad('←'), dright: mkDpad('→'),
+  lsl: mkStick('stick', '←'), lsr: mkStick('stick', '→'),
+  lsu: mkStick('stick', '↑'), lsd: mkStick('stick', '↓'),
+  // N64 C-buttons are yellow on real hardware; we keep the cstick rendering
+  // generic (matches GC/Switch) so the arrow icons read cleanly.
+  csl: mkStick('cstick', '←'), csr: mkStick('cstick', '→'),
+  csu: mkStick('cstick', '↑'), csd: mkStick('cstick', '↓'),
+  mx: mkMod('MX'), my: mkMod('MY'),
+  rt_light: mkShoulder('Lt'), rt_mid: mkShoulder('Md'),
+};
+
 const PLATFORM_STYLES = {
   xbox: XBOX_STYLE,
   playstation: PS_STYLE,
   switch: SWITCH_STYLE,
   gamecube: GC_STYLE,
+  n64: N64_STYLE,
 };
 
 // ---------------------------------------------------------------------------
@@ -662,6 +828,44 @@ const PLATFORM_ICONS = {
     start:   _SVG.switch__switch_button_plus,
     select:  _SVG.switch__switch_button_minus,
     capture: _SVG.switch__switch_button_sync,
+  },
+  // N64 borrows GC's face buttons, Z, C-stick, D-pad, and menu icons; trigger
+  // icons come from Switch (single-letter L / R). Left stick / clicks / home
+  // stay universal across all platform styles.
+  n64: {
+    // Face buttons (from GameCube)
+    a:       _SVG.gc__gamecube_button_color_a,
+    b:       _SVG.gc__gamecube_button_color_b,
+    // X/Y don't exist on the N64 — keep GC's as a safe fallback for cross-mode use
+    x:       _SVG.gc__gamecube_button_x_tilted,
+    y:       _SVG.gc__gamecube_button_y_tilted,
+    // Z (from GameCube)
+    rb:      _SVG.gc__gamecube_button_z,
+    // L / R (from Switch)
+    lt:      _SVG.switch__switch_button_l,
+    rt:      _SVG.switch__switch_button_r,
+    // C-buttons (from GameCube)
+    csu:     _SVG.gc__gamecube_stick_c_color_up,
+    csd:     _SVG.gc__gamecube_stick_c_color_down,
+    csl:     _SVG.gc__gamecube_stick_c_color_left,
+    csr:     _SVG.gc__gamecube_stick_c_color_right,
+    // D-pad (from GameCube)
+    dup:     _SVG.gc__gamecube_dpad_up,
+    ddown:   _SVG.gc__gamecube_dpad_down,
+    dleft:   _SVG.gc__gamecube_dpad_left,
+    dright:  _SVG.gc__gamecube_dpad_right,
+    // Menu buttons (matching GameCube's choices)
+    start:   _SVG.gc__gamecube_button_start,
+    select:  _SVG.switch__switch_button_minus,
+    capture: _SVG.switch__switch_button_sync,
+    // Universal left stick + clicks + home
+    lsu:     _SVG.universal__xbox_stick_l_up,
+    lsd:     _SVG.universal__xbox_stick_l_down,
+    lsl:     _SVG.universal__xbox_stick_l_left,
+    lsr:     _SVG.universal__xbox_stick_l_right,
+    ls:      _SVG.universal__xbox_stick_side_l,
+    rs:      _SVG.universal__xbox_stick_side_r,
+    home:    _SVG.universal__switch_button_home,
   },
   // GC uses its own dpad and C-stick; left stick + clicks + home use universal.
   gamecube: {
@@ -1116,6 +1320,62 @@ function isKeyboardProfile(profile) {
   return profile?.modeId === 'MODE_KEYBOARD';
 }
 
+// ---------------------------------------------------------------------------
+// Custom mode helpers
+// Each profile that selects MODE_CUSTOM has a 1-based index into
+// Config.customModes[] (mirrors the rgbConfig / keyboardModeConfig pattern).
+// The firmware's CustomControllerMode walks digitalButtonMappings (output
+// index = DigitalOutput-1) and stickDirectionMappings (index =
+// StickDirectionButton-1) to figure out which physical button activates each
+// output, plus a list of modifier rules that scale or override stick axes.
+// ---------------------------------------------------------------------------
+function isCustomProfile(profile) {
+  return profile?.modeId === 'MODE_CUSTOM';
+}
+
+function makeBlankCustomConfig() {
+  return {
+    digitalButtonMappings: [],
+    stickDirectionMappings: [],
+    analogTriggerMappings: [],
+    modifiers: [],
+    stickRange: 80,
+    buttonComboMappings: [],
+  };
+}
+
+function ensureCustomConfig(profile) {
+  if (!config) return null;
+  if (!Array.isArray(config.customModes)) config.customModes = [];
+
+  const idx = (profile.customModeConfig || 0) - 1;
+  if (idx >= 0 && idx < config.customModes.length && config.customModes[idx]) {
+    return config.customModes[idx];
+  }
+  // Pad with blank CustomModeConfig objects (NOT nulls) — protobuf encoding
+  // rejects null entries, same as the rgbConfigs pattern.
+  const fresh = makeBlankCustomConfig();
+  if (profile.customModeConfig && profile.customModeConfig > 0) {
+    while (config.customModes.length < profile.customModeConfig - 1) {
+      config.customModes.push(makeBlankCustomConfig());
+    }
+    if (config.customModes.length === profile.customModeConfig - 1) {
+      config.customModes.push(fresh);
+    }
+    return fresh;
+  }
+  config.customModes.push(fresh);
+  profile.customModeConfig = config.customModes.length;
+  return fresh;
+}
+
+function getCustomConfig(profile) {
+  if (!profile || !config?.customModes) return null;
+  const idx = (profile.customModeConfig || 0) - 1;
+  if (idx < 0) return null;
+  return config.customModes[idx] || null;
+}
+
 // MB1 is the hardware "open device menu" button — never remappable, but it has
 // an addressable LED so its color can still be customized.
 const NON_REMAPPABLE_BUTTONS = new Set(['BTN_MB1']);
@@ -1458,9 +1718,56 @@ function resolveButtonOutput(physBtnId, profile, rmap) {
 
   const logical = resolveLogicalButton(physBtnId, rmap);
   if (!logical) return null;
+
+  // CUSTOM mode bypasses MODE_OUTPUT_MAP and reads from the profile's
+  // CustomModeConfig instead. The firmware uses the post-remap (logical)
+  // button to look up outputs, so we honor the same chain.
+  if (isCustomProfile(profile)) {
+    return resolveCustomButtonOutput(logical, profile);
+  }
+
   const modeMap = MODE_OUTPUT_MAP[profile.modeId];
   if (!modeMap) return null;
   return modeMap[logical] || null;
+}
+
+// Look up a physical button in the CustomModeConfig arrays. Returns the
+// internal output id ('a', 'lsl', 'mod:0', 'trig:0', …) if the button is
+// bound to any digital output, stick direction, modifier group, or trigger
+// mapping. Resolution priority: digital → stick direction → modifier → trigger.
+// (A button can technically be bound to both a digital output and a modifier
+// at once — both fire in firmware — but the controller-button rendering only
+// shows one label, so digital wins for display.)
+function resolveCustomButtonOutput(btnId, profile) {
+  const cc = getCustomConfig(profile);
+  if (!cc) return null;
+  const digital = cc.digitalButtonMappings || [];
+  for (let i = 0; i < digital.length; i++) {
+    if (digital[i] === btnId) {
+      const out = DIGITAL_OUTPUT_TO_OUTPUT_ID[i];
+      if (out) return out;
+    }
+  }
+  const stickDirs = cc.stickDirectionMappings || [];
+  for (let i = 0; i < stickDirs.length; i++) {
+    if (stickDirs[i] === btnId) {
+      const out = STICK_DIR_TO_OUTPUT_ID[i];
+      if (out) return out;
+    }
+  }
+  // Modifier group lookup: a button belongs to a group iff any modifier
+  // entry's `buttons` array contains it (groups share their buttons across
+  // axes, so finding one match is enough).
+  const groups = modifierGroups(cc);
+  for (let i = 0; i < groups.length; i++) {
+    if (groups[i].buttons.includes(btnId)) return modifierOutputId(i);
+  }
+  // Trigger mappings: one button per AnalogTriggerMapping entry.
+  const triggers = cc.analogTriggerMappings || [];
+  for (let i = 0; i < triggers.length; i++) {
+    if (triggers[i].button === btnId) return triggerOutputId(i);
+  }
+  return null;
 }
 
 function addProfile() {
@@ -1555,7 +1862,11 @@ function buildControllerSVG() {
       }
     } else {
       const outputId = resolveButtonOutput(btn.id, profile, rmap);
-      const baseStyle = outputId ? platformStyle[outputId] : null;
+      // Virtual outputs (M:n / T:n) aren't in PLATFORM_STYLES — synthesise a
+      // generic style so they render the same on every platform tab.
+      const baseStyle = outputId
+        ? (platformStyle[outputId] || virtualOutputStyle(outputId))
+        : null;
       style = baseStyle ? { ...baseStyle, _outputId: outputId } : null;
     }
     const isMapped = !!style;
@@ -1950,8 +2261,19 @@ function renderSettingsPanel() {
   // for the user) and Button Remapping (firmware bypasses it per
   // CustomKeyboardMode.cpp).
   const keyboardMode = isKeyboardProfile(profile);
+  const customMode   = isCustomProfile(profile);
   $('backends-group').style.display = keyboardMode ? 'none' : '';
-  $('remap-group').style.display    = keyboardMode ? 'none' : '';
+  // Button Remapping section: visible for every mode. In keyboard / custom
+  // modes the firmware doesn't actually read profile.buttonRemapping (those
+  // modes carry their own per-button data), but the rows are still
+  // interactive — they edit the keyboard / custom config directly. The
+  // Advanced toggle is hidden in those modes since it only operates on
+  // buttonRemapping; + Add Remap stays visible and seeds a new binding.
+  $('remap-group').style.display    = '';
+  const advToggle = document.querySelector('#remap-body .remap-mode-switch');
+  if (advToggle) advToggle.style.display = (keyboardMode || customMode) ? 'none' : '';
+  $('custom-group').hidden          = !customMode;
+  if (customMode) renderCustomModeSection(profile);
 
   // Mode select
   const modeSelect = $('set-mode-id');
@@ -2050,6 +2372,238 @@ function renderRgbSection(profile) {
   }
 
   renderAllSavedColorPalettes();
+}
+
+// ---------------------------------------------------------------------------
+// Custom mode section
+// Per-profile UI for editing CustomModeConfig.stickRange and the modifier
+// list. Button mappings are NOT edited here — those are set per-button via
+// the assign popup that opens when clicking a controller button.
+// ---------------------------------------------------------------------------
+function renderCustomModeSection(profile) {
+  const cc = ensureCustomConfig(profile);
+  if (!cc) return;
+  // Coerce undefined/0 to the Melee default so the input shows something sane.
+  $('set-custom-stick-range').value = String(cc.stickRange || 80);
+  renderCustomModifierList(profile, cc);
+  renderCustomTriggerList(profile, cc);
+}
+
+// Each row in the modifier list is one M-group — it owns a set of per-axis
+// multipliers that all activate together when the M-group's bound physical
+// button is held. The button assignment is NOT shown here; the user binds it
+// via the popup grid (the M{n} virtual output appears alongside A / B / etc.).
+function renderCustomModifierList(profile, cc) {
+  const list = $('custom-modifiers-list');
+  list.innerHTML = '';
+  if (!Array.isArray(cc.modifiers)) cc.modifiers = [];
+  modifierGroups(cc).forEach((group, groupIdx) => {
+    list.appendChild(buildModifierGroupRow(profile, cc, group, groupIdx));
+  });
+}
+
+function buildModifierGroupRow(profile, cc, group, groupIdx) {
+  const row = document.createElement('div');
+  row.className = 'custom-modifier-row';
+
+  // Header: "M{n}  →  [phys dropdown]". The dropdown is a shortcut for the
+  // popup-grid path — picking a button here calls the same setCustomButton-
+  // Output helper that the M1 glyph would, plus clearing collapses to empty
+  // buttons[] (firmware short-circuits empty mask).
+  const head = document.createElement('div');
+  head.className = 'custom-group-head';
+  const currentBtn = group.buttons[0];   // M-group binds to exactly one phys
+  head.innerHTML = `
+    <span class="custom-group-name">M${groupIdx + 1}</span>
+    <span class="remap-sep" aria-hidden="true">→</span>
+    <select class="custom-group-bind" title="Bind this modifier to a physical button">
+      ${physButtonOptionsWithUnbound(currentBtn)}
+    </select>
+  `;
+  head.querySelector('select').addEventListener('change', e => {
+    const newBtn = e.target.value;
+    if (!newBtn) {
+      // Unbound: clear this phys from every entry in the group. The group's
+      // entries stay (so the M-row + axis multipliers persist) but buttons=[]
+      // means the firmware skips them via the mask=0 check.
+      for (const entry of group.entries) entry.buttons = [];
+    } else {
+      setCustomButtonOutput(profile, newBtn, modifierOutputId(groupIdx));
+    }
+    renderRemapList(profile);
+    buildControllerSVG();
+    renderCustomModifierList(profile, cc);
+  });
+  row.appendChild(head);
+
+  // Per-axis multiplier inputs. Six axes total — the firmware supports more
+  // but stick/trigger axes are the only ones useful here.
+  const settings = document.createElement('div');
+  settings.className = 'custom-modifier-settings custom-modifier-axes';
+  for (const axis of ANALOG_AXES) {
+    const cur = group.axes[axis.value] ?? '';
+    const field = document.createElement('div');
+    field.className = 'custom-modifier-field';
+    field.innerHTML = `
+      <label>${escHtml(axis.label)}</label>
+      <input type="number" step="0.01" min="0" max="2"
+             placeholder="—" value="${cur !== '' ? cur : ''}">
+    `;
+    field.querySelector('input').addEventListener('input', e => {
+      const raw = e.target.value.trim();
+      writeModifierAxis(cc, group, axis.value, raw === '' ? null : parseFloat(raw));
+      // Don't re-render — would lose input focus mid-typing. The group's
+      // entries reference cc.modifiers directly so changes are already live.
+    });
+    settings.appendChild(field);
+  }
+  row.appendChild(settings);
+
+  // Combination mode dropdown (single value for the whole group).
+  const modeRow = document.createElement('div');
+  modeRow.className = 'custom-modifier-mode-row';
+  modeRow.innerHTML = `
+    <label>Mode</label>
+    <select>${
+      MOD_COMBINATION_MODES.map(m =>
+        `<option value="${m.value}"${m.value === group.combinationMode ? ' selected' : ''}>${escHtml(m.label)}</option>`
+      ).join('')
+    }</select>
+  `;
+  modeRow.querySelector('select').addEventListener('change', e => {
+    for (const entry of group.entries) entry.combinationMode = e.target.value;
+  });
+  row.appendChild(modeRow);
+
+  // Remove button — drops every entry in this group.
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'custom-modifier-remove';
+  remove.title = 'Remove modifier';
+  remove.setAttribute('aria-label', 'Remove modifier');
+  remove.textContent = '✕';
+  remove.addEventListener('click', () => {
+    cc.modifiers = cc.modifiers.filter(m => !group.entries.includes(m));
+    renderCustomModifierList(profile, cc);
+    buildControllerSVG();
+  });
+  row.appendChild(remove);
+
+  return row;
+}
+
+// Set / clear an axis multiplier on an M-group:
+//  - If there's already a proto entry for this axis in the group, update it
+//    (or delete it if `value` is null).
+//  - Otherwise append a new AnalogModifier entry to cc.modifiers using the
+//    group's existing button-set + combination mode.
+function writeModifierAxis(cc, group, axis, value) {
+  if (!Array.isArray(cc.modifiers)) cc.modifiers = [];
+  const existing = group.entries.find(e => e.axis === axis);
+  if (value == null || Number.isNaN(value)) {
+    if (existing) {
+      cc.modifiers = cc.modifiers.filter(m => m !== existing);
+      group.entries = group.entries.filter(m => m !== existing);
+      delete group.axes[axis];
+    }
+    return;
+  }
+  if (existing) {
+    existing.multiplier = value;
+  } else {
+    const entry = {
+      buttons: [...group.buttons],
+      axis,
+      multiplier: value,
+      combinationMode: group.combinationMode || 'COMBINATION_MODE_OVERRIDE',
+    };
+    cc.modifiers.push(entry);
+    group.entries.push(entry);
+  }
+  group.axes[axis] = value;
+}
+
+// Analog trigger list. Each row is one AnalogTriggerMapping = T{n}. The user
+// edits the trigger (LT/RT) + analog value here, and binds it to a physical
+// button via the popup grid (the T{n} virtual output).
+function renderCustomTriggerList(profile, cc) {
+  const list = $('custom-triggers-list');
+  if (!list) return;
+  list.innerHTML = '';
+  if (!Array.isArray(cc.analogTriggerMappings)) cc.analogTriggerMappings = [];
+  cc.analogTriggerMappings.forEach((t, idx) => {
+    list.appendChild(buildAnalogTriggerRow(profile, cc, t, idx));
+  });
+}
+
+function buildAnalogTriggerRow(profile, cc, trigger, idx) {
+  const row = document.createElement('div');
+  row.className = 'custom-modifier-row';
+
+  // Header: "T{n} → [phys dropdown]" — same shortcut as the M-row picker.
+  const head = document.createElement('div');
+  head.className = 'custom-group-head';
+  head.innerHTML = `
+    <span class="custom-group-name">T${idx + 1}</span>
+    <span class="remap-sep" aria-hidden="true">→</span>
+    <select class="custom-group-bind" title="Bind this trigger to a physical button">
+      ${physButtonOptionsWithUnbound(trigger.button)}
+    </select>
+  `;
+  head.querySelector('select').addEventListener('change', e => {
+    const newBtn = e.target.value;
+    if (!newBtn) {
+      // Clearing: set the proto field to BTN_UNSPECIFIED — firmware's
+      // get_button short-circuits on that, so the trigger never fires.
+      trigger.button = 'BTN_UNSPECIFIED';
+    } else {
+      setCustomButtonOutput(profile, newBtn, triggerOutputId(idx));
+    }
+    renderRemapList(profile);
+    buildControllerSVG();
+    renderCustomTriggerList(profile, cc);
+  });
+  row.appendChild(head);
+
+  const settings = document.createElement('div');
+  settings.className = 'custom-modifier-settings';
+  // Trigger axis dropdown
+  const trigField = document.createElement('div');
+  trigField.className = 'custom-modifier-field';
+  trigField.innerHTML = `<label>Trigger</label><select>${
+    ANALOG_TRIGGERS.map(t => `<option value="${t.value}"${t.value === trigger.trigger ? ' selected' : ''}>${escHtml(t.label)}</option>`).join('')
+  }</select>`;
+  trigField.querySelector('select').addEventListener('change', e => {
+    trigger.trigger = e.target.value;
+  });
+  settings.appendChild(trigField);
+
+  // Value 0-255
+  const valField = document.createElement('div');
+  valField.className = 'custom-modifier-field';
+  valField.innerHTML = `<label>Value (0–255)</label><input type="number" min="0" max="255" step="1" value="${trigger.value ?? 49}">`;
+  valField.querySelector('input').addEventListener('input', e => {
+    const v = parseInt(e.target.value, 10);
+    if (!Number.isNaN(v)) trigger.value = Math.max(0, Math.min(255, v));
+  });
+  settings.appendChild(valField);
+
+  row.appendChild(settings);
+
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'custom-modifier-remove';
+  remove.title = 'Remove trigger';
+  remove.setAttribute('aria-label', 'Remove trigger');
+  remove.textContent = '✕';
+  remove.addEventListener('click', () => {
+    cc.analogTriggerMappings.splice(idx, 1);
+    renderCustomTriggerList(profile, cc);
+    buildControllerSVG();
+  });
+  row.appendChild(remove);
+
+  return row;
 }
 
 // Fixed stick / d-pad axes for the controller-mode SOCD UI. The D-pad is
@@ -2222,6 +2776,51 @@ function renderRemapList(profile) {
   const chk = $('chk-remap-mode');
   if (chk) chk.checked = remapViewMode === 'advanced';
 
+  // Keyboard / custom modes don't use profile.buttonRemapping — the firmware
+  // reads keyboardModeConfig.buttonsToKeycodes (keyboard) or
+  // customModes[i].digitalButtonMappings / stickDirectionMappings (custom).
+  // Rows here are interactive: the user can swap the physical button on the
+  // left and the output (custom) or keycode (keyboard) on the right; the ✕
+  // clears the binding. + Add Remap seeds a new binding on the first
+  // currently-unbound physical button.
+  if (isKeyboardProfile(profile)) {
+    const kb = getKeyboardConfig(profile);
+    const entries = (kb?.buttonsToKeycodes || []).filter(e => e.button && e.button !== 'BTN_UNSPECIFIED');
+    // Stable order: by physical-button order on the device layout.
+    entries.sort((a, b) => physBtnSortIndex(a.button) - physBtnSortIndex(b.button));
+    for (const e of entries) {
+      list.appendChild(buildKeyboardRemapRow(e.button, e.keycode, profile));
+    }
+    return;
+  }
+  if (isCustomProfile(profile)) {
+    const cc = getCustomConfig(profile);
+    if (cc) {
+      const rows = [];
+      (cc.digitalButtonMappings || []).forEach((btn, i) => {
+        if (btn && btn !== 'BTN_UNSPECIFIED') {
+          rows.push({ phys: btn, output: DIGITAL_OUTPUT_TO_OUTPUT_ID[i] });
+        }
+      });
+      (cc.stickDirectionMappings || []).forEach((btn, i) => {
+        if (btn && btn !== 'BTN_UNSPECIFIED') {
+          rows.push({ phys: btn, output: STICK_DIR_TO_OUTPUT_ID[i] });
+        }
+      });
+      // Sort by output position in POPUP_OUTPUT_ORDER for a predictable order
+      // (matches the simple controller-mode view).
+      rows.sort((a, b) => {
+        const ia = POPUP_OUTPUT_ORDER.indexOf(a.output);
+        const ib = POPUP_OUTPUT_ORDER.indexOf(b.output);
+        return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+      });
+      for (const { phys, output } of rows) {
+        list.appendChild(buildCustomRemapRow(phys, output, profile));
+      }
+    }
+    return;
+  }
+
   if (remapViewMode === 'simple') {
     const modeMap = MODE_OUTPUT_MAP[profile.modeId] || {};
     const rmap = remapMap(profile);
@@ -2285,8 +2884,23 @@ function outputDropdownLabel(outputId) {
     mx: 'Mod X', my: 'Mod Y',
   };
   if (FIXED[outputId]) return FIXED[outputId];
+  if (isModifierOutputId(outputId)) return 'M' + (parseGroupIdx(outputId) + 1);
+  if (isTriggerOutputId(outputId))  return 'T' + (parseGroupIdx(outputId) + 1);
   const style = (PLATFORM_STYLES[selectedPlatform] || XBOX_STYLE)[outputId];
   return style?.label || outputId;
+}
+
+// Synthesise a render-style for the M-{n} / T-{n} virtual outputs. Both look
+// like compact rounded rects (kind: 'mod') so they pop visually next to the
+// other shoulder/system buttons in the popup grid.
+function virtualOutputStyle(outputId) {
+  if (isModifierOutputId(outputId)) {
+    return { label: 'M' + (parseGroupIdx(outputId) + 1), bg: DARK_BG, fg: LIGHT_TEXT, kind: 'mod' };
+  }
+  if (isTriggerOutputId(outputId)) {
+    return { label: 'T' + (parseGroupIdx(outputId) + 1), bg: DARK_BG, fg: LIGHT_TEXT, kind: 'mod' };
+  }
+  return null;
 }
 
 // Tooltip label for a controller button. In keyboard mode we already have a
@@ -2301,6 +2915,154 @@ function tooltipOutputLabel(style, keyboardMode) {
 // Simple view: built from the effective mapping (physBtn + resolved outputId).
 // Changes use setRemap() to create/update buttonRemapping entries as needed.
 // X disables the button (adds a disabled remap entry → hidden from simple view).
+// Sort-key helper so remap rows show in a consistent device-layout order
+// (matches the BUTTON_LAYOUT array which already follows the physical SVG
+// arrangement).
+const _PHYS_BTN_ORDER = (() => {
+  const m = new Map();
+  BUTTON_LAYOUT.forEach((b, i) => m.set(b.id, i));
+  return m;
+})();
+function physBtnSortIndex(btnId) {
+  return _PHYS_BTN_ORDER.get(btnId) ?? 999;
+}
+
+// Return the first physical button (in BUTTON_LAYOUT order, excluding MBs)
+// that has no binding under the active mode's data model. Used by + Add
+// Remap to pick a sensible default phys for a new binding.
+function findFirstUnboundPhysButton(profile) {
+  const bound = new Set();
+  if (isCustomProfile(profile)) {
+    const cc = getCustomConfig(profile);
+    for (const arr of [cc?.digitalButtonMappings, cc?.stickDirectionMappings]) {
+      for (const b of arr || []) {
+        if (b && b !== 'BTN_UNSPECIFIED') bound.add(b);
+      }
+    }
+  } else if (isKeyboardProfile(profile)) {
+    const kb = getKeyboardConfig(profile);
+    for (const e of (kb?.buttonsToKeycodes || [])) {
+      if (e.button) bound.add(e.button);
+    }
+  }
+  for (const btn of BUTTON_LAYOUT) {
+    if (btn.id.startsWith('BTN_MB')) continue;
+    if (!bound.has(btn.id)) return btn.id;
+  }
+  return null;
+}
+
+// Build the <option> list for a physical-button dropdown — all non-MB
+// physical buttons, with the currently-bound one selected.
+function physButtonOptions(selectedBtnId) {
+  return BUTTON_LAYOUT
+    .filter(b => !b.id.startsWith('BTN_MB'))
+    .map(b => `<option value="${b.id}"${b.id === selectedBtnId ? ' selected' : ''}>${b.id.replace('BTN_', '')}</option>`)
+    .join('');
+}
+
+// Same as physButtonOptions but prepends an "(unbound)" entry that maps to the
+// empty string. Used by the M-group / T-entry in-row pickers where the binding
+// can be cleared.
+function physButtonOptionsWithUnbound(selectedBtnId) {
+  const unboundSelected = !selectedBtnId || selectedBtnId === 'BTN_UNSPECIFIED' ? ' selected' : '';
+  return `<option value=""${unboundSelected}>(unbound)</option>` + physButtonOptions(selectedBtnId);
+}
+
+// CUSTOM-mode remap row. Both sides are interactive selects.
+//  - Phys select: changing it moves the binding to a different button.
+//  - Output select: changing it rebinds this physical button to a different
+//    output (digital or stick direction).
+//  - ✕: clears the binding.
+function buildCustomRemapRow(physBtn, currentOutputId, profile) {
+  const row = document.createElement('div');
+  row.className = 'remap-item';
+
+  const outputOpts = POPUP_OUTPUT_ORDER
+    .filter(id => CUSTOM_MODE_OUTPUTS.has(id))
+    .map(id => `<option value="${id}"${id === currentOutputId ? ' selected' : ''}>${escHtml(outputDropdownLabel(id))}</option>`)
+    .join('');
+
+  row.innerHTML = `
+    <select title="Physical button">${physButtonOptions(physBtn)}</select>
+    <span class="remap-sep">→</span>
+    <select title="Output">${outputOpts}</select>
+    <button class="item-del-btn" title="Clear this binding">✕</button>
+  `;
+  const [physSel, outSel] = row.querySelectorAll('select');
+
+  physSel.addEventListener('change', () => {
+    const newPhys = physSel.value;
+    if (newPhys === physBtn) return;
+    // Move the binding: clear the old phys, write the current output to the new.
+    clearCustomButtonBinding(profile, physBtn);
+    setCustomButtonOutput(profile, newPhys, outSel.value);
+    renderRemapList(profile);
+    buildControllerSVG();
+  });
+
+  outSel.addEventListener('change', () => {
+    setCustomButtonOutput(profile, physBtn, outSel.value);
+    renderRemapList(profile);
+    buildControllerSVG();
+  });
+
+  row.querySelector('.item-del-btn').addEventListener('click', () => {
+    clearCustomButtonBinding(profile, physBtn);
+    renderRemapList(profile);
+    buildControllerSVG();
+  });
+
+  return row;
+}
+
+// KEYBOARD-mode remap row. Phys side is a select; keycode side is a
+// clickable label that delegates to the assign popup's key-capture flow
+// (the popup already has a polished press-any-key UX; reusing it keeps the
+// two entry points consistent and avoids a 100-option dropdown).
+function buildKeyboardRemapRow(physBtn, keycode, profile) {
+  const row = document.createElement('div');
+  row.className = 'remap-item';
+
+  const keyLabel = keycode != null ? keycodeToLabel(keycode) : '(unbound)';
+  row.innerHTML = `
+    <select title="Physical button">${physButtonOptions(physBtn)}</select>
+    <span class="remap-sep">→</span>
+    <button type="button" class="remap-keycode-btn" title="Click to re-bind (press any key)">${escHtml(keyLabel)}</button>
+    <button class="item-del-btn" title="Clear this binding">✕</button>
+  `;
+  const physSel = row.querySelector('select');
+
+  physSel.addEventListener('change', () => {
+    const newPhys = physSel.value;
+    if (newPhys === physBtn) return;
+    // Move the keycode to the new physical button; clear the old.
+    setButtonKeycode(profile, physBtn, null);
+    setButtonKeycode(profile, newPhys, keycode);
+    renderRemapList(profile);
+    buildControllerSVG();
+  });
+
+  row.querySelector('.remap-keycode-btn').addEventListener('click', (e) => {
+    // Delegate to the assign popup for capture — it already has the
+    // "press any key" UI + Esc-cancels-capture behavior.
+    // Stop propagation so the document-level "close popup on outside click"
+    // handler doesn't fire on the same click and immediately close what we
+    // just opened. The remap row sits outside both #output-popup and any
+    // .btn-group, so without this the popup would flicker open and close.
+    e.stopPropagation();
+    openOutputPopup(physBtn);
+  });
+
+  row.querySelector('.item-del-btn').addEventListener('click', () => {
+    setButtonKeycode(profile, physBtn, null);
+    renderRemapList(profile);
+    buildControllerSVG();
+  });
+
+  return row;
+}
+
 function buildRemapRowSimple(physBtn, currentOutputId, profile) {
   const modeMap = MODE_OUTPUT_MAP[profile.modeId] || {};
   const row = document.createElement('div');
@@ -2431,15 +3193,63 @@ function findPhysicalButtonForOutput(outputId, modeId) {
 }
 
 // Outputs that are always assignable regardless of mode (system / menu buttons).
-const SYSTEM_OUTPUTS = new Set(['start', 'select', 'capture', 'home', 'ls', 'rs']);
+// "System" outputs that any non-MB button is allowed to be bound to even when
+// the active mode map doesn't natively produce them. LS / RS are deliberately
+// NOT here: only modes whose firmware actually wires outputs.leftStickClick /
+// rightStickClick (FGC + CUSTOM) should let the user bind them. Melee / PM /
+// Ultimate / RoA(2) / Smash64 never set those output fields, so binding LS
+// to a button would silently do nothing on the device.
+const SYSTEM_OUTPUTS = new Set(['start', 'select', 'capture', 'home']);
+
+// Backends whose protocol has an LS / RS stick-click button. GameCube, N64,
+// NES, SNES, and Configurator either don't support stick clicks at all or
+// don't apply here. If a profile's applicableBackends contains *none* of
+// these, binding 'ls' / 'rs' is silently dropped at the firmware layer — so
+// we strip those outputs from the popup grid to match.
+const BACKENDS_WITH_STICK_CLICK = new Set([
+  'COMMS_BACKEND_DINPUT',
+  'COMMS_BACKEND_XINPUT',
+  'COMMS_BACKEND_NINTENDO_SWITCH',
+]);
+
+function profileSupportsStickClick(profile) {
+  const backends = profile?.applicableBackends;
+  if (!Array.isArray(backends) || backends.length === 0) return true;
+  return backends.some(b => BACKENDS_WITH_STICK_CLICK.has(b));
+}
 
 // Set of outputs available in the current profile's mode.
-// Always includes SYSTEM_OUTPUTS so start/select/capture/home can be bound to
-// any button, including LF/RF/LT/RT.
-function availableOutputs(modeId) {
-  const modeMap = MODE_OUTPUT_MAP[modeId];
-  const base = modeMap ? new Set(Object.values(modeMap)) : new Set();
-  for (const s of SYSTEM_OUTPUTS) base.add(s);
+// Always includes SYSTEM_OUTPUTS (start/select/capture/home) so those can be
+// bound to any button regardless of mode.
+//
+// CUSTOM mode bypasses MODE_OUTPUT_MAP: any DigitalOutput or
+// StickDirectionButton the firmware supports is bindable.
+//
+// 'ls' / 'rs' (stick clicks) are only available when the mode's map actually
+// wires them (FGC + CUSTOM) AND the profile has at least one backend that
+// carries them (DInput / XInput / Switch — not GameCube / N64 / NES / SNES).
+function availableOutputs(profile) {
+  const modeId = profile?.modeId;
+  let base;
+  if (modeId === 'MODE_CUSTOM') {
+    base = new Set(CUSTOM_MODE_OUTPUTS);
+    // Append virtual outputs for each modifier group and trigger entry
+    // currently defined on this profile's custom config — these become the
+    // popup-assignable "M1, M2, … / T1, T2, …" buttons.
+    const cc = getCustomConfig(profile);
+    if (cc) {
+      modifierGroups(cc).forEach((_g, i) => base.add(modifierOutputId(i)));
+      (cc.analogTriggerMappings || []).forEach((_t, i) => base.add(triggerOutputId(i)));
+    }
+  } else {
+    const modeMap = MODE_OUTPUT_MAP[modeId];
+    base = modeMap ? new Set(Object.values(modeMap)) : new Set();
+    for (const s of SYSTEM_OUTPUTS) base.add(s);
+  }
+  if (!profileSupportsStickClick(profile)) {
+    base.delete('ls');
+    base.delete('rs');
+  }
   return base;
 }
 
@@ -2479,12 +3289,20 @@ function openOutputPopup(btnId, _evt) {
     grid.innerHTML = '';
     if (remappable) {
       const platformStyle = PLATFORM_STYLES[selectedPlatform] || XBOX_STYLE;
-      const available = availableOutputs(profile.modeId);
+      const available = availableOutputs(profile);
 
+      // First pass: the fixed order of platform outputs.
       for (const outId of POPUP_OUTPUT_ORDER) {
         if (!available.has(outId)) continue;
-        const style = platformStyle[outId];
+        const style = platformStyle[outId] || virtualOutputStyle(outId);
         if (!style) continue;
+        grid.appendChild(renderOutputGlyph(outId, style));
+      }
+      // Second pass: any M:* / T:* virtual outputs the profile defines. They
+      // come after the standard outputs since their numbering is data-driven.
+      for (const outId of available) {
+        if (!isModifierOutputId(outId) && !isTriggerOutputId(outId)) continue;
+        const style = virtualOutputStyle(outId);
         grid.appendChild(renderOutputGlyph(outId, style));
       }
     }
@@ -2677,6 +3495,17 @@ function applyOutput(outputId) {
     return;
   }
 
+  // CUSTOM mode: write the physical button id directly into the right slot
+  // of digitalButtonMappings[] or stickDirectionMappings[]. Each physical
+  // button is allowed to drive at most one output, so we first clear it
+  // from every slot in either array before writing the new binding.
+  if (isCustomProfile(profile)) {
+    setCustomButtonOutput(profile, selectedBtnId, outputId);
+    closeOutputPopup();
+    renderAll();
+    return;
+  }
+
   // Main buttons: figure out which physical button produces this output in this mode,
   // then write a buttonRemapping entry (selectedBtn -> phys).
   const phys = findPhysicalButtonForOutput(outputId, profile.modeId);
@@ -2697,12 +3526,99 @@ function unmapSelected() {
     const mbIdx = parseInt(selectedBtnId.slice(6), 10) - 1;
     if (!profile.menuButtonIcon) profile.menuButtonIcon = emptyMenuIconArray();
     profile.menuButtonIcon[mbIdx] = 'OUT_UNSPECIFIED';
+  } else if (isCustomProfile(profile)) {
+    // CUSTOM mode: clear this physical button from any custom-mode slot it
+    // currently occupies (digital output or stick direction).
+    clearCustomButtonBinding(profile, selectedBtnId);
   } else {
     // Disable button: { physicalButton: BTN_X } with no activates.
     setRemap(selectedBtnId, null);
   }
   closeOutputPopup();
   renderAll();
+}
+
+// CUSTOM mode write helpers --------------------------------------------------
+//
+// digitalButtonMappings[] is indexed by (DigitalOutput - 1); stickDirection-
+// Mappings[] is indexed by (StickDirectionButton - 1). To bind a physical
+// button to a given output we (1) clear any prior slot it occupied and (2)
+// write its id into the new slot, padding the array with BTN_UNSPECIFIED if
+// the target index is beyond the array's current length.
+
+function setCustomButtonOutput(profile, btnId, outputId) {
+  const cc = ensureCustomConfig(profile);
+  if (!cc) return;
+  clearCustomButtonBinding(profile, btnId);
+
+  if (outputId in OUTPUT_ID_TO_DIGITAL_INDEX) {
+    const idx = OUTPUT_ID_TO_DIGITAL_INDEX[outputId];
+    if (!Array.isArray(cc.digitalButtonMappings)) cc.digitalButtonMappings = [];
+    while (cc.digitalButtonMappings.length <= idx) {
+      cc.digitalButtonMappings.push('BTN_UNSPECIFIED');
+    }
+    cc.digitalButtonMappings[idx] = btnId;
+  } else if (outputId in OUTPUT_ID_TO_STICK_INDEX) {
+    const idx = OUTPUT_ID_TO_STICK_INDEX[outputId];
+    if (!Array.isArray(cc.stickDirectionMappings)) cc.stickDirectionMappings = [];
+    while (cc.stickDirectionMappings.length <= idx) {
+      cc.stickDirectionMappings.push('BTN_UNSPECIFIED');
+    }
+    cc.stickDirectionMappings[idx] = btnId;
+  } else if (isModifierOutputId(outputId)) {
+    // Modifier group: write [btnId] to every modifier entry that shares the
+    // group's button-set. The user is moving the activation condition for
+    // the entire M-group (all its axes) to this physical button.
+    const groupIdx = parseGroupIdx(outputId);
+    const groups = modifierGroups(cc);
+    const target = groups[groupIdx];
+    if (target) {
+      for (const entry of target.entries) {
+        entry.buttons = [btnId];
+      }
+    }
+  } else if (isTriggerOutputId(outputId)) {
+    const triggers = cc.analogTriggerMappings || [];
+    const t = triggers[parseGroupIdx(outputId)];
+    if (t) t.button = btnId;
+  }
+}
+
+function clearCustomButtonBinding(profile, btnId) {
+  const cc = getCustomConfig(profile);
+  if (!cc) return;
+  if (Array.isArray(cc.digitalButtonMappings)) {
+    for (let i = 0; i < cc.digitalButtonMappings.length; i++) {
+      if (cc.digitalButtonMappings[i] === btnId) {
+        cc.digitalButtonMappings[i] = 'BTN_UNSPECIFIED';
+      }
+    }
+  }
+  if (Array.isArray(cc.stickDirectionMappings)) {
+    for (let i = 0; i < cc.stickDirectionMappings.length; i++) {
+      if (cc.stickDirectionMappings[i] === btnId) {
+        cc.stickDirectionMappings[i] = 'BTN_UNSPECIFIED';
+      }
+    }
+  }
+  // Modifier groups: drop btnId from any entry's buttons array. If a group
+  // ends up with no buttons we LEAVE the entries in place (buttons=[] is
+  // safely skipped by the firmware via the `mask != 0` check in
+  // all_buttons_held) so the M-group keeps its slot in the UI.
+  if (Array.isArray(cc.modifiers)) {
+    for (const m of cc.modifiers) {
+      if (Array.isArray(m.buttons) && m.buttons.includes(btnId)) {
+        m.buttons = m.buttons.filter(b => b !== btnId);
+      }
+    }
+  }
+  // Triggers: same idea — clearing leaves the entry with button=UNSPECIFIED,
+  // which get_button() short-circuits to false in firmware.
+  if (Array.isArray(cc.analogTriggerMappings)) {
+    for (const t of cc.analogTriggerMappings) {
+      if (t.button === btnId) t.button = 'BTN_UNSPECIFIED';
+    }
+  }
 }
 
 function setRemap(physBtnId, activates) {
@@ -2718,28 +3634,60 @@ function setRemap(physBtnId, activates) {
 // ---------------------------------------------------------------------------
 // Full render
 // ---------------------------------------------------------------------------
-// Show the GameCube platform tab only when the current profile has the GC
-// backend selected. Reverts to Xbox if GC tab disappears while active.
+// Show/hide console-specific platform tabs (GameCube, Nintendo 64) based on
+// the active profile's backends, and auto-switch the display style when a
+// console backend becomes active or goes away.
+//
+//  - If the GC backend is enabled, the GameCube tab is shown and (when the
+//    user isn't already on a console tab) we auto-switch to it. Same for N64.
+//  - If the currently-selected console tab's backend disappears, we fall back
+//    to whichever other console tab is still active, or 'xbox' as a last resort.
+//  - If both GC and N64 are enabled on a profile, both tabs are visible and
+//    the user picks. GameCube wins the auto-switch tie because it's listed
+//    first in CONSOLE_TABS.
+const CONSOLE_TABS = [
+  { platform: 'gamecube', backend: 'COMMS_BACKEND_GAMECUBE' },
+  { platform: 'n64',      backend: 'COMMS_BACKEND_N64'      },
+];
+
 function updateGcTab() {
   const profile = currentProfile();
-  const gcTab = document.querySelector('.platform-tab[data-platform="gamecube"]');
-  if (!gcTab) return;
   // Keyboard mode doesn't emit gamepad outputs, so the platform display style
-  // (Xbox/PS/Switch/GameCube) doesn't apply — hide the whole bar.
+  // (Xbox/PS/Switch/GameCube/N64) doesn't apply — hide the whole bar.
   const platformBar = document.querySelector('.platform-bar');
   if (platformBar) platformBar.classList.toggle('hidden', isKeyboardProfile(profile));
-  const gcEnabled = profile?.applicableBackends?.includes('COMMS_BACKEND_GAMECUBE') ?? false;
-  gcTab.classList.toggle('hidden', !gcEnabled);
-  if (gcEnabled && selectedPlatform !== 'gamecube') {
-    // Auto-switch to GameCube display style when the active profile uses GC backend.
-    selectedPlatform = 'gamecube';
+
+  // Toggle each console tab and find the first one whose backend is enabled
+  // (used both for the auto-switch target and the fallback when a different
+  // console tab's backend disappears).
+  let firstEnabled = null;
+  const enabledByPlatform = {};
+  for (const { platform, backend } of CONSOLE_TABS) {
+    const tab = document.querySelector(`.platform-tab[data-platform="${platform}"]`);
+    if (!tab) continue;
+    const enabled = profile?.applicableBackends?.includes(backend) ?? false;
+    tab.classList.toggle('hidden', !enabled);
+    enabledByPlatform[platform] = enabled;
+    if (enabled && !firstEnabled) firstEnabled = platform;
+  }
+
+  const consolePlatforms = new Set(CONSOLE_TABS.map(t => t.platform));
+  const onConsoleTab = consolePlatforms.has(selectedPlatform);
+  let target = null;
+
+  if (onConsoleTab && !enabledByPlatform[selectedPlatform]) {
+    // The console tab the user was on just lost its backend — fall back.
+    target = firstEnabled || 'xbox';
+  } else if (!onConsoleTab && firstEnabled) {
+    // User was on Xbox/PS/Switch and a console backend just became active —
+    // auto-switch to that console's display style.
+    target = firstEnabled;
+  }
+
+  if (target && target !== selectedPlatform) {
+    selectedPlatform = target;
     document.querySelectorAll('.platform-tab').forEach(t =>
-      t.classList.toggle('active', t.dataset.platform === 'gamecube'));
-    buildControllerSVG();
-  } else if (!gcEnabled && selectedPlatform === 'gamecube') {
-    selectedPlatform = 'xbox';
-    document.querySelectorAll('.platform-tab').forEach(t =>
-      t.classList.toggle('active', t.dataset.platform === 'xbox'));
+      t.classList.toggle('active', t.dataset.platform === selectedPlatform));
     buildControllerSVG();
   }
 }
@@ -2794,11 +3742,72 @@ function wireSettingsHandlers() {
     }
 
     p.modeId = newMode;
+    // Entering CUSTOM creates a blank CustomModeConfig if the profile doesn't
+    // already point at one (1-based index, matches the rgbConfig pattern).
+    // We also clear buttonRemapping — CustomControllerMode goes through the
+    // same HandleRemap as other modes (it inherits from ControllerMode), so
+    // explicit-disable entries left over from the old mode would silently
+    // turn off buttons the user expects to be able to bind. The custom-mode
+    // editor itself doesn't use buttonRemapping, so there's no UI to surface
+    // those entries either. Switching OUT of CUSTOM leaves the config alone.
+    if (newMode === 'MODE_CUSTOM') {
+      ensureCustomConfig(p);
+      p.buttonRemapping = [];
+    }
     // applicableBackends / menuButtonIcon / rgbConfig stay untouched.
     renderProfileList();
     renderSettingsPanel();   // toggle backends/remap visibility
     buildControllerSVG();    // re-render with new mode's labels
     updateGcTab();
+  });
+
+  // Custom mode: stick range input
+  $('set-custom-stick-range').addEventListener('input', () => {
+    const p = currentProfile();
+    if (!p) return;
+    const cc = ensureCustomConfig(p);
+    const v = parseInt($('set-custom-stick-range').value, 10);
+    if (!Number.isNaN(v)) cc.stickRange = Math.max(0, Math.min(127, v));
+  });
+
+  // Custom mode: add a new M-group. Materialise one AnalogModifier entry per
+  // stick axis with multiplier = 1.0 (no-op for both Override and Compound
+  // modes) so the inputs start visibly populated with "no change" defaults.
+  // The user edits them down or up. Empty `buttons` means the modifier never
+  // fires until the user binds a phys via the popup grid (firmware's
+  // all_buttons_held returns false on mask=0).
+  $('btn-add-custom-modifier').addEventListener('click', () => {
+    const p = currentProfile();
+    if (!p) return;
+    const cc = ensureCustomConfig(p);
+    if (!Array.isArray(cc.modifiers)) cc.modifiers = [];
+    for (const axis of ANALOG_AXES) {
+      cc.modifiers.push({
+        buttons: [],
+        axis: axis.value,
+        multiplier: MODIFIER_NO_CHANGE_MULTIPLIER,
+        combinationMode: 'COMBINATION_MODE_OVERRIDE',
+      });
+    }
+    renderCustomModifierList(p, cc);
+    buildControllerSVG();
+  });
+
+  // Custom mode: add a new T-entry. Default to LT with full-press value (255).
+  // The user can drop it for light/mid shield as needed. Button left as
+  // BTN_UNSPECIFIED — firmware's get_button short-circuits on that.
+  $('btn-add-custom-trigger').addEventListener('click', () => {
+    const p = currentProfile();
+    if (!p) return;
+    const cc = ensureCustomConfig(p);
+    if (!Array.isArray(cc.analogTriggerMappings)) cc.analogTriggerMappings = [];
+    cc.analogTriggerMappings.push({
+      button: 'BTN_UNSPECIFIED',
+      trigger: 'TRIGGER_LT',
+      value: TRIGGER_FULL_PRESS_VALUE,
+    });
+    renderCustomTriggerList(p, cc);
+    buildControllerSVG();
   });
 
   // Collapsible Button Remapping section
@@ -2913,6 +3922,27 @@ function wireSettingsHandlers() {
   $('btn-add-remap').addEventListener('click', () => {
     const p = currentProfile();
     if (!p) return;
+
+    // Custom mode: bind the first unbound phys to a default output ('a').
+    // The user can immediately edit either side from the row.
+    if (isCustomProfile(p)) {
+      const phys = findFirstUnboundPhysButton(p);
+      if (!phys) return;
+      setCustomButtonOutput(p, phys, 'a');
+      renderRemapList(p);
+      buildControllerSVG();
+      return;
+    }
+    // Keyboard mode: bind the first unbound phys to HID keycode 4 ('A').
+    if (isKeyboardProfile(p)) {
+      const phys = findFirstUnboundPhysButton(p);
+      if (!phys) return;
+      setButtonKeycode(p, phys, 4);
+      renderRemapList(p);
+      buildControllerSVG();
+      return;
+    }
+
     if (!p.buttonRemapping) p.buttonRemapping = [];
 
     if (remapViewMode === 'simple') {
@@ -3238,6 +4268,9 @@ function wireToolbarHandlers() {
     el.classList.remove('capturing');
     el.textContent = keycodeToLabel(hid);
     buildControllerSVG();
+    // The Button Remapping list mirrors keyboardMode.buttonsToKeycodes — refresh
+    // so the new binding shows up there too.
+    if (isKeyboardProfile(profile)) renderRemapList(profile);
   });
 
   // "Assign Esc" — Escape during capture cancels, so it can't be bound that
@@ -3251,6 +4284,7 @@ function wireToolbarHandlers() {
     el.classList.remove('capturing');
     el.textContent = keycodeToLabel(41);
     buildControllerSVG();
+    if (isKeyboardProfile(profile)) renderRemapList(profile);
   });
 
   $('popup-remove-lighting').addEventListener('click', () => {
