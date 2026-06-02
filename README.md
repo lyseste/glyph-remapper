@@ -11,11 +11,11 @@
 ## Table of contents
 
 1. [Quick start](#quick-start)
-2. [Features](#features)
-3. [Project layout](#project-layout)
-4. [How the app talks to the device](#how-the-app-talks-to-the-device)
-5. [Data model](#data-model)
-6. [Mode system](#mode-system)
+2. [Project layout](#project-layout)
+3. [How the app talks to the device](#how-the-app-talks-to-the-device)
+4. [Data model](#data-model)
+5. [Mode system](#mode-system)
+6. [Custom mode](#custom-mode)
 7. [Contributing](#contributing)
 
 ---
@@ -62,17 +62,19 @@ You can also work entirely offline using the **Config File** ⬇ / ⬆ buttons t
 
 1. `PROTO_DEF` — inline protobuf schema (`GregTurbo/HayBox-proto#db4e2f6`)
 2. `BUTTON_LAYOUT` — physical button positions in the controller SVG (viewBox `912 × 491`)
-3. `PLATFORM_STYLES` (Xbox / PS / Switch / GameCube) + `MODE_OUTPUT_MAP` with per-mode mappings
-4. HID keycode tables + keyboard helpers
-5. RGB / LED helpers (`ensureRgbConfig`, `getButtonColor`, `setButtonColor`, `stripDisabledLeds`, …)
-6. Button-remap helpers (`remapMap`, `resolveLogicalButton`, `resolveButtonOutput`, `findPhysicalButtonForOutput`, `preserveOutputsAcrossModeChange`, …)
-7. WebSerial I/O (`serialConnect`, `sendPacket`, `readPacket`, `loadConfigFromDevice`, `saveConfigToDevice`)
-8. protobuf encode/decode (`configToBinary`, `binaryToConfig`)
-9. SVG render loop (`buildControllerSVG`) + `renderButtonIcon` and glyph builders
-10. Popup logic (`openOutputPopup`, `applyOutput`, `unmapSelected`, key-capture, color controls)
-11. Sidebar + settings panel rendering and event wiring
-12. `DEFAULT_CONFIG_JSON` with an embedded "Load Defaults" payload, mirrors the official Limit Labs default profile set
-13. `DOMContentLoaded` boot
+3. `PLATFORM_STYLES` (Xbox / PS / Switch / GameCube / N64) + `MODE_OUTPUT_MAP` with per-mode mappings, plus `PLATFORM_ICONS` mapping output ids to baked-in SVG glyphs
+4. HID keycode tables + keyboard helpers (`ensureKeyboardConfig`, `getButtonKeycode`, `setButtonKeycode`)
+5. Custom-mode helpers (`ensureCustomConfig`, `getCustomConfig`, `modifierGroups`, `setCustomButtonOutput`, `clearCustomButtonBinding`, virtual-output id helpers)
+6. RGB / LED helpers (`ensureRgbConfig`, `getButtonColor`, `setButtonColor`, `stripDisabledLeds`, …)
+7. Button-remap helpers (`remapMap`, `resolveLogicalButton`, `resolveButtonOutput`, `findPhysicalButtonForOutput`, `preserveOutputsAcrossModeChange`, `resolveCustomButtonOutput`, …)
+8. WebSerial I/O (`serialConnect`, `sendPacket`, `readPacket`, `loadConfigFromDevice`, `saveConfigToDevice`)
+9. protobuf encode/decode (`configToBinary`, `binaryToConfig`)
+10. SVG render loop (`buildControllerSVG`) + `renderButtonIcon` and glyph builders
+11. Popup logic (`openOutputPopup`, `applyOutput`, `unmapSelected`, key-capture, color controls, M / T virtual outputs)
+12. Sidebar + settings panel rendering (`renderSettingsPanel`, `renderRemapList`, `renderRgbSection`, `renderCustomModeSection`, `renderCustomModifierList`, `renderCustomTriggerList`) and event wiring
+13. `updateGcTab` console-tab driver (handles both GameCube and Nintendo 64 auto-switching via `CONSOLE_TABS`)
+14. `DEFAULT_CONFIG_JSON` with an embedded "Load Defaults" payload, mirrors the official Limit Labs default profile set
+15. `DOMContentLoaded` boot
 
 ---
 
@@ -135,14 +137,15 @@ Everything mirrors the firmware's protobuf `Config` message (defined in [GregTur
 Config
 ├── gameModeConfigs[]                 ← profiles
 │   └── GameModeConfig
-│       ├── modeId                    ← MODE_MELEE / MODE_FGC / MODE_KEYBOARD / …
+│       ├── modeId                    ← MODE_MELEE / MODE_FGC / MODE_KEYBOARD / MODE_CUSTOM / …
 │       ├── name
 │       ├── socdPairs[]               ← per-profile SOCD rules
-│       ├── buttonRemapping[]         ← physical button → logical button (bypassed by keyboard mode)
+│       ├── buttonRemapping[]         ← physical button → logical button (bypassed by keyboard mode; cleared on entry to custom mode)
 │       ├── applicableBackends[]      ← COMMS_BACKEND_* strings
 │       ├── menuButtonIcon[7]         ← MB1..MB7 icons (display-only; firmware MB→output mapping is fixed)
 │       ├── rgbConfig                 ← 1-based index into Config.rgbConfigs[]
-│       └── keyboardModeConfig        ← 1-based index into Config.keyboardModes[] (KEYBOARD only)
+│       ├── keyboardModeConfig        ← 1-based index into Config.keyboardModes[] (KEYBOARD only)
+│       └── customModeConfig          ← 1-based index into Config.customModes[] (CUSTOM only)
 │
 ├── rgbConfigs[]                      ← LED palettes, shared by index
 │   └── RgbConfig
@@ -155,6 +158,15 @@ Config
 │   └── KeyboardModeConfig
 │       └── buttonsToKeycodes[]       ← { button: 'BTN_X', keycode: <USB HID scancode> }
 │
+├── customModes[]                     ← custom controller-mode configs, shared by index
+│   └── CustomModeConfig              ← see the "Custom mode" section for what each field means
+│       ├── digitalButtonMappings[]   ← phys button per DigitalOutput slot (A, B, X, Y, LB, RB, …, L3, R3)
+│       ├── stickDirectionMappings[]  ← phys button per StickDirectionButton slot (LS-Up/Down/Left/Right, RS-…)
+│       ├── analogTriggerMappings[]   ← { button, trigger: LT/RT, value: 0-255 } — for partial trigger presses
+│       ├── modifiers[]               ← { buttons[], axis: LSTICK_X/Y or RSTICK_X/Y, multiplier, combinationMode } — multi-entry M-groups
+│       ├── stickRange                ← uint32 0-127, analog half-width from neutral (80 = Melee, 100 = full Switch range)
+│       └── buttonComboMappings[]     ← multi-button → single output (not yet exposed in the UI)
+│
 ├── communicationBackendConfigs[]
 ├── rgbBrightness                     ← uint32 0-255
 └── defaultBackendConfig / defaultUsbBackendConfig / defaultDashboardOption
@@ -162,10 +174,12 @@ Config
 
 ### Important pitfalls
 
-- **`rgbConfig` and `keyboardModeConfig` are 1-based.** Value `0` means "unset"; index into the array is `value − 1`. Helpers `ensureRgbConfig()` / `ensureKeyboardConfig()` always pad with valid blank objects (never `null`) so protobuf encoding can't fail.
-- **Multiple profiles can share an `rgbConfig` index.** Editing one currently edits the other's palette too. Copy-on-write is a future cleanup.
+- **`rgbConfig`, `keyboardModeConfig`, and `customModeConfig` are 1-based.** Value `0` means "unset"; index into the array is `value − 1`. Helpers `ensureRgbConfig()` / `ensureKeyboardConfig()` / `ensureCustomConfig()` always pad with valid blank objects (never `null`) so protobuf encoding can't fail.
+- **Multiple profiles can share an `rgbConfig` index** (and the same applies to `keyboardModeConfig` / `customModeConfig`). Editing one currently edits the other's data too. Copy-on-write is a future cleanup.
 - **Color values are packed uint32** in `0xRRGGBB` form. `colorIntToHex` / `parseHexInput` convert.
 - **Explicit disables** are remap entries with no `activates` field (`{physicalButton: 'BTN_X'}`). This is how the official defaults mark unused buttons; the firmware treats them as no-op.
+- **Custom mode clears `buttonRemapping`** on entry. `CustomControllerMode` still goes through the framework's `HandleRemap` step, so explicit-disable entries left over from the previous mode would silently kill buttons that should work. The mode-change handler resets `buttonRemapping = []` when transitioning into `MODE_CUSTOM`.
+- **`preserveOutputsAcrossModeChange` skips CUSTOM transitions.** The custom mode has no `MODE_OUTPUT_MAP` entry — the preserve step would interpret that as "no outputs exist in the new mode" and disable every button.
 
 ---
 
@@ -181,8 +195,9 @@ Each mode interprets the physical buttons differently. The app captures this in 
 | `MODE_RIVALS_OF_AETHER` | `ROA_MAP` | PFM + RF9 fires `buttonL` (LB on XInput). |
 | `MODE_RIVALS2` | `ROA2_MAP` | PFM + LT5 fires `buttonL`. |
 | `MODE_FGC` | `FGC_MAP` | Digital D-pad on LF1/LF2/LF3/LT1; face buttons on RF1-8; L-stick directions on LF8/LF6/LF7/LT6; C-stick on RT2-5. |
-| `MODE_64` | `SMASH64_MAP` | Smash 64 C-pad on RF7/RF8/RF2/RF6 instead of the RT cluster. |
+| `MODE_64` | `SMASH64_MAP` | Smash 64 C-pad on RF7/RF8/RF2/RF6 instead of the RT cluster. Pairs with the N64 backend (which auto-activates the N64 display style). |
 | `MODE_KEYBOARD` | (none) | Each physical button fires a USB HID scancode from `KeyboardModeConfig.buttonsToKeycodes`; `buttonRemapping` is bypassed by the firmware. |
+| `MODE_CUSTOM` | (data-driven) | No static map — `CustomModeConfig` carries the entire button-to-output mapping. See the [Custom mode](#custom-mode) section. |
 
 ### How the popup actually creates a remap
 
@@ -208,6 +223,80 @@ This is why **`preserveOutputsAcrossModeChange()`** exists — when the mode cha
 - `Escape` cancels capture without binding (so the user can always escape the capture state).
 - The firmware bypasses `buttonRemapping` (see `CustomKeyboardMode.cpp`); the host follows the same convention.
 - Backends section is hidden because **only the DInput backend emits HID keyboard reports**. Switching into keyboard mode forces `applicableBackends = ['COMMS_BACKEND_DINPUT']`; switching out restores the USB triplet. Non-keyboard ↔ non-keyboard transitions don't touch the backend list.
+- The Button Remapping section stays visible but is interactive against `keyboardModeConfig.buttonsToKeycodes` rather than `buttonRemapping`: phys-button dropdown + clickable keycode label (delegates to the popup's key-capture flow) + `+ Add Remap` that seeds the first unbound phys with HID `4` (`A`). The Advanced toggle is hidden.
+
+---
+
+## Custom mode
+
+`MODE_CUSTOM` is the firmware's data-driven controller mode (`CustomControllerMode.cpp`). It carries the entire button→output mapping plus a list of analog modifiers and analog trigger overrides, so the user can build a controller layout that doesn't match any of the built-in modes. The configurator's "Custom Mode" section in the right panel edits a `CustomModeConfig` (looked up by `profile.customModeConfig`, 1-based, mirrors the `rgbConfig` / `keyboardModeConfig` pattern).
+
+### Button mappings
+
+Two ordered arrays:
+
+- **`digitalButtonMappings[]`** — indexed by `(DigitalOutput - 1)`. Slot `0` is the physical button that fires output `A`, slot `1` is `B`, …, slot `17` is `R3`. Eighteen slots in total (`a, b, x, y, lb, rb, lt, rt, start, select, home, capture, dup, ddown, dleft, dright, ls, rs`).
+- **`stickDirectionMappings[]`** — eight slots indexed by `(StickDirectionButton - 1)`: `lsu, lsd, lsl, lsr, csu, csd, csl, csr`.
+
+`resolveCustomButtonOutput(btnId, profile)` walks both arrays to find the output a given physical button is currently bound to. `setCustomButtonOutput(profile, btnId, outputId)` writes to the right slot, padding with `BTN_UNSPECIFIED` if the target index is beyond the array's current length, and clearing any prior binding of that physical button before writing the new one.
+
+In the UI, clicking a button on the controller opens the standard popup — but `availableOutputs(profile)` returns the full `CUSTOM_MODE_OUTPUTS` set (everything in the two arrays) plus virtual `M:n` and `T:n` outputs (see below). LS / RS are still filtered out when no backend supports stick clicks (DInput / XInput / Switch).
+
+### Stick range
+
+`CustomModeConfig.stickRange` is the analog half-width from neutral (`128`) on both stick axes. The firmware uses it as `min = 128 - stickRange` and `max = 128 + stickRange`. Common values:
+
+| Range | Effect |
+|------|--------|
+| `80`  | Melee analog range (default). |
+| `100` | Full XInput / Switch range. |
+| `60`  | Soft tilt — useful for analog games where full tilt is too sensitive. |
+
+### Modifiers
+
+The most powerful piece of custom mode. Each `AnalogModifier` proto entry is `(buttons[], axis, multiplier, combinationMode)` — one entry per axis. The configurator groups entries that share the same `buttons` array into a single **M-group** in the UI; each row exposes per-axis multipliers for the four stick axes (`L-Stick X / Y`, `R-Stick X / Y`) plus a Combination Mode dropdown that applies to the whole group.
+
+When the modifier's buttons are held, the firmware applies the multiplier to each axis it has an entry for:
+
+- **`COMBINATION_MODE_OVERRIDE`** — `output = NEUTRAL + stickRange × multiplier × sign(current)`. Replaces whatever the unmodified mapping produced, while keeping the same direction. `multiplier = 1.0` is the no-op (full tilt in the same direction).
+- **`COMBINATION_MODE_COMPOUND`** — `output = NEUTRAL + (current - NEUTRAL) × multiplier`. Scales whatever's already there. `multiplier = 1.0` is again the no-op; `0.5` softens the input, `2.0` exaggerates it.
+
+The Combination Mode is per-M-group (all axes in the group share it). Override is the typical choice — it produces a deterministic stick position regardless of how the underlying mapping is wired.
+
+#### Trigger axes deliberately omitted
+
+The proto's `AnalogAxis` includes `AXIS_LTRIGGER` and `AXIS_RTRIGGER` and the firmware does run them through the modifier loop, but the end of `CustomControllerMode::UpdateAnalogOutputs` has an unconditional digital-trigger force-override (`if (outputs.triggerLDigital) outputs.triggerLAnalog = 255`) that clobbers anything written earlier in the same frame. So a modifier on `AXIS_LTRIGGER` is effectively dead-letter whenever the underlying L button is bound — its effect disappears before it leaves the frame. The UI doesn't expose those axes; use analog trigger mappings (T-entries, below) for partial trigger presses instead.
+
+### Analog triggers
+
+Each `AnalogTriggerMapping` entry is `(button, trigger: LT/RT, value: 0-255)`. While the button is held, the firmware sets the corresponding analog trigger to the configured value. Use these for partial trigger presses (Melee light shield ≈ 49, mid shield ≈ 94) without going through the modifier system.
+
+The configurator presents these as **T-entries** (T1, T2, …). Each row picks the trigger axis (`LT` or `RT`) and the value. The button is bound either via the in-row dropdown or via the **T{n}** glyph in the popup.
+
+### Persistence
+
+The firmware short-circuits two cases that the configurator relies on:
+
+```cpp
+inline bool all_buttons_held(uint64_t buttons, uint64_t mask) {
+    return mask != 0 && (buttons & mask) == mask;          // mask = 0 short-circuits
+}
+inline bool get_button(uint64_t buttons, Button btn) {
+    if (btn == BTN_UNSPECIFIED) return false;              // BTN_UNSPECIFIED short-circuits
+    return buttons & (1ULL << (btn - 1));
+}
+```
+
+So an M-group with `buttons = []` never fires (`make_button_mask` returns 0), and a T-entry with `button = BTN_UNSPECIFIED` never fires either. This means **unassigned M-groups and T-entries persist safely** in the proto across save / reload — you can configure multipliers / trigger values first, then bind to a button later, without worrying about the firmware spuriously activating them in the meantime.
+
+### Platform tabs auto-switch for console backends
+
+The platform display bar (Xbox / PlayStation / Switch) gains a console tab for any backend whose protocol has its own labels:
+
+- `COMMS_BACKEND_GAMECUBE` → adds the **GameCube** tab (`GC_STYLE`).
+- `COMMS_BACKEND_N64` → adds the **64** tab (`N64_STYLE`, borrows GameCube's A/B/Z/C-stick/menu glyphs and Switch's L/R glyphs).
+
+`CONSOLE_TABS` drives the tab visibility + auto-switch logic in `updateGcTab()`. When a console backend becomes active and the user isn't already on a console tab, the platform style auto-switches to it. Removing the backend reverts to the previous tab (other console first, then Xbox).
 
 ---
 
@@ -234,10 +323,11 @@ This is why **`preserveOutputsAcrossModeChange()`** exists — when the mode cha
 
 ### Adding a new platform display style
 
-1. Define a `<PLATFORM>_STYLE` object with entries for every output id (`a`, `b`, `x`, `y`, `lb`, …, `dup`, …, `lsl`, …, `csu`, …, `mx`, `my`, `rt_light`, `rt_mid`). The helpers `mkFace`, `mkShoulder`, `mkSystem`, `mkDpad`, `mkStick`, `mkMod`, `mkFaceGlyph` cover the common patterns.
+1. Define a `<PLATFORM>_STYLE` object with entries for every output id (`a`, `b`, `x`, `y`, `lb`, …, `dup`, …, `lsl`, …, `csu`, …, `mx`, `my`, `rt_light`, `rt_mid`). The helpers `mkFace`, `mkShoulder`, `mkSystem`, `mkDpad`, `mkStick`, `mkMod`, `mkFaceGlyph` cover the common patterns. This is the text-label / color fallback.
 2. Add it to `PLATFORM_STYLES`.
 3. Add a tab in `index.html` (`<button class="platform-tab" data-platform="<name>">`).
-4. If you want platform-specific Kenney SVG icons, add entries to the `_SVG_BY_PLATFORM` map.
+4. If you want platform-specific baked-in SVG icons (preferred over text labels), add an entry to `PLATFORM_ICONS` mapping each output id to a data-URI from the `_SVG` constant. You can borrow glyphs from another platform (the N64 style borrows GameCube + Switch icons rather than carrying its own) by referencing the same `_SVG.*` keys.
+5. If the platform style should auto-activate when a specific backend is enabled (like GameCube and N64), add an entry to `CONSOLE_TABS` in `updateGcTab()` mapping the platform to its backend id.
 
 ### Adding a new backend
 
@@ -246,9 +336,17 @@ This is why **`preserveOutputsAcrossModeChange()`** exists — when the mode cha
 3. Add to `BACKEND_CHOICES`. The renderer handles both `string` and `{id, label, members}` forms.
 4. If the backend needs a forced display style (like GameCube does), wire it into `updateGcTab()` / `selectedPlatform`.
 
+### Extending custom mode
+
+Things to keep in mind when adding to the CUSTOM mode surface:
+
+- **M-groups are derived, not stored** — `modifierGroups(cc)` walks `cc.modifiers` and groups entries by `buttons.sort().join('|')`. If you add a new way to mutate modifiers, make sure entries belonging to one M-group keep the same `buttons` array across all axes, otherwise the UI will split them into separate groups.
+- **Virtual outputs** — `M:n` and `T:n` are synthesised output ids (see `MODIFIER_OUTPUT_PREFIX` / `TRIGGER_OUTPUT_PREFIX`). If you add another kind of CUSTOM-mode binding that needs popup-grid visibility, follow the same pattern: an `isXOutputId` predicate, a `virtualOutputStyle()` branch, and a write path in `setCustomButtonOutput`.
+- **Don't trust unassigned bindings to fire** — the firmware's `all_buttons_held` short-circuits on mask=0 and `get_button` returns false for `BTN_UNSPECIFIED`, but only on the `pico` HAL. If you ever target the AVR HAL, double-check those guards.
+
 ### Testing protobuf round-trips
 
-When touching anything that mutates `config.rgbConfigs`, `config.keyboardModes`, `config.gameModeConfigs`, or any encoding helper, run this in the browser dev console:
+When touching anything that mutates `config.rgbConfigs`, `config.keyboardModes`, `config.customModes`, `config.gameModeConfigs`, or any encoding helper, run this in the browser dev console:
 
 ```js
 const ok = await ensureProtobuf();
