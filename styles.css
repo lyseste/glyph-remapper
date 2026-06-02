@@ -544,8 +544,14 @@ html, body {
 }
 
 /* Unmapped buttons: hide accent ring, add soft shadow */
-.btn-group.unmapped .btn-ring {
+/* Ring visibility is driven purely by the `.led-on` flag now — buttons with
+   no LED entry (or color = #000000) get no ring regardless of whether
+   they're mapped to an output. */
+.btn-ring {
   display: none;
+}
+.btn-group.led-on .btn-ring {
+  display: block;
 }
 
 .btn-group.unmapped .btn-fill {
@@ -1525,11 +1531,56 @@ html, body {
 /* Popup LED color row */
 .output-popup-color {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  gap: 8px;
   margin-top: 12px;
   padding-top: 10px;
   border-top: 1px solid var(--border);
+}
+.output-popup-led-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.output-popup-led-row {
+  display: flex;
+  gap: 6px;
+}
+.popup-led-toggle {
+  flex: 1;
+  height: 34px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 7px;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  letter-spacing: 0.12em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.popup-led-on:hover {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+  background: var(--bg-hover);
+}
+.popup-led-off:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: var(--bg-hover);
+}
+.output-popup-color-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .popup-color-swatch {
@@ -1691,7 +1742,21 @@ html, body {
 
 /* Apply button sits between the value being applied and the saved-color
    palette (static) or below the speed slider (rainbow). */
-.rgb-apply-btn { margin-top: 2px; }
+/* Apply + Clear sit side-by-side on the same row, splitting the available
+   width evenly. Some breathing room above so they don't kiss the field
+   they're acting on (the value being applied / the speed slider). */
+.rgb-action-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+.rgb-action-row .btn { flex: 1; min-width: 0; }
+/* The Clear button is destructive-adjacent — keep the secondary look but
+   tint hover red so the action is obvious. */
+.rgb-clear-btn:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: var(--danger);
+}
 
 .rgb-speed-row {
   display: flex;

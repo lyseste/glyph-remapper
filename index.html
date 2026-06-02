@@ -132,7 +132,10 @@
               <input type="text" id="set-rgb-color-hex" class="rgb-color-hex setting-input" value="#22d3ee" maxlength="7" spellcheck="false" aria-label="Static color hex">
               <button type="button" id="btn-save-color" class="rgb-save-color" title="Save this color to the palette" aria-label="Save color">+</button>
             </div>
-            <button type="button" id="btn-apply-rgb-static" class="btn btn-small rgb-apply-btn">Apply to mapped buttons</button>
+            <div class="rgb-action-row">
+              <button type="button" id="btn-apply-rgb-static" class="btn btn-small rgb-apply-btn">Apply to active</button>
+              <button type="button" id="btn-clear-rgb-static" class="btn btn-small rgb-clear-btn" title="Set every LED on the device to off (#000000)">Clear all</button>
+            </div>
             <div id="panel-saved-colors" class="saved-colors" hidden></div>
           </div>
           <div id="rgb-rainbow-controls" class="rgb-rainbow-controls" hidden>
@@ -140,7 +143,10 @@
               <span class="rgb-speed-label">Speed</span>
               <input type="range" id="set-rgb-speed" class="rgb-speed-slider" min="0" max="4" step="1" value="2" aria-label="Rainbow animation speed">
             </label>
-            <button type="button" id="btn-apply-rgb-rainbow" class="btn btn-small rgb-apply-btn">Apply to mapped buttons</button>
+            <div class="rgb-action-row">
+              <button type="button" id="btn-apply-rgb-rainbow" class="btn btn-small rgb-apply-btn">Apply to active</button>
+              <button type="button" id="btn-clear-rgb-rainbow" class="btn btn-small rgb-clear-btn" title="Set every LED on the device to off (#000000)">Clear all</button>
+            </div>
           </div>
         </div>
         <div class="setting-group" id="custom-group" hidden>
@@ -192,10 +198,16 @@
     </div>
     <button id="output-popup-unmap" class="output-popup-unmap">UNBIND</button>
     <div id="output-popup-color" class="output-popup-color">
-      <button type="button" id="popup-color-swatch" class="popup-color-swatch" aria-label="Open color picker" style="background:#22d3ee"></button>
-      <input type="text" id="popup-color-hex" class="popup-color-hex" value="#22d3ee" maxlength="7" spellcheck="false" aria-label="LED hex color">
-      <button type="button" id="popup-save-color" class="popup-save-color" title="Save this color to the palette" aria-label="Save color">+</button>
-      <button type="button" id="popup-remove-lighting" class="popup-remove-lighting" title="Turn LED off for this button" aria-label="Turn LED off">⊘</button>
+      <div class="output-popup-led-label">LED</div>
+      <div class="output-popup-led-row">
+        <button type="button" id="popup-led-on" class="popup-led-toggle popup-led-on" title="Turn LED on (default color)" aria-label="Turn LED on">ON</button>
+        <button type="button" id="popup-led-off" class="popup-led-toggle popup-led-off" title="Turn LED off for this button" aria-label="Turn LED off">OFF</button>
+      </div>
+      <div class="output-popup-color-row">
+        <button type="button" id="popup-color-swatch" class="popup-color-swatch" aria-label="Open color picker" style="background:#22d3ee"></button>
+        <input type="text" id="popup-color-hex" class="popup-color-hex" value="#22d3ee" maxlength="7" spellcheck="false" aria-label="LED hex color">
+        <button type="button" id="popup-save-color" class="popup-save-color" title="Save this color to the palette" aria-label="Save color">+</button>
+      </div>
     </div>
     <div id="output-popup-rainbow" class="output-popup-rainbow" hidden>
       <button type="button" id="popup-rainbow-on" class="popup-rainbow-on" title="Include this button in the rainbow animation" aria-label="Include in rainbow"></button>

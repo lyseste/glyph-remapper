@@ -1636,13 +1636,17 @@ function getRgbConfig(profile) {
 }
 
 // Get the LED color (as uint32) for a physical button on this profile.
-// Falls back to the profile's default color, then to the global default.
+// Returns 0 (off) when there's no entry — matches the firmware, which
+// zeroes _button_colors[] then overwrites only the buttons that have an
+// entry in the proto. The configurator used to fall back to defaultColor
+// here, but that disagreed with the device behavior and made it impossible
+// for the UI to express "this button's LED is intentionally off".
 function getButtonColor(profile, btnId) {
   const rgb = getRgbConfig(profile);
-  if (!rgb) return DEFAULT_LED_COLOR_INT;
+  if (!rgb) return 0;
   const entry = rgb.buttonColors?.find(c => c.button === btnId);
   if (entry) return Number(entry.color) >>> 0;
-  return (rgb.defaultColor != null) ? (Number(rgb.defaultColor) >>> 0) : DEFAULT_LED_COLOR_INT;
+  return 0;
 }
 
 function setButtonColor(profile, btnId, color) {
@@ -1673,10 +1677,16 @@ function stripDisabledLeds(cfg) {
 
 // Live-update the ring stroke for a single button without rebuilding the whole SVG.
 // The .btn-ring stroke reads from --led-color via CSS, so we set the custom
-// property on the group element (inline style — overrides CSS rules).
+// property on the group element (inline style — overrides CSS rules). Also
+// toggles the `.led-on` class so the ring shows / hides as the color flips
+// between zero and non-zero (CSS hides the ring when `.led-on` is absent).
 function applyLiveButtonColor(btnId, colorInt) {
   const g = svg().querySelector(`[data-btn="${btnId}"]`);
-  if (g) g.style.setProperty('--led-color', colorIntToHex(colorInt));
+  if (!g) return;
+  g.style.setProperty('--led-color', colorIntToHex(colorInt));
+  const ledOn = NON_REMAPPABLE_BUTTONS.has(btnId)
+    || (hasLED(btnId) && colorInt !== 0);
+  g.classList.toggle('led-on', ledOn);
 }
 
 function remapMap(profile) {
@@ -1882,17 +1892,22 @@ function buildControllerSVG() {
       style = baseStyle ? { ...baseStyle, _outputId: outputId } : null;
     }
     const isMapped = !!style;
-    // Ring visibility:
-    //   - MB1: always shown (it has an LED, can't be remapped → ring is the only signal)
-    //   - MB2-MB7: never shown (no physical LED on the device)
-    //   - all other buttons: shown when mapped
-    const showRing = NON_REMAPPABLE_BUTTONS.has(btn.id)
-      || (isMapped && hasLED(btn.id));
+    // Ring visibility is independent of "mapped" status now — driven purely
+    // by the stored LED color (so users can light up unassigned buttons).
+    //   - MB1: always shown (no off state on the device for this menu button)
+    //   - MB2-MB7: no LED hardware, ring never shown
+    //   - everything else: shown iff the stored color is non-zero
+    const ledOn = NON_REMAPPABLE_BUTTONS.has(btn.id)
+      || (hasLED(btn.id) && getButtonColor(profile, btn.id) !== 0);
 
     const classes = ['btn-group'];
     if (btn.large) classes.push('btn-large');
     if (btn.menu) classes.push('btn-menu');
-    classes.push(showRing ? 'mapped' : 'unmapped');
+    // `mapped` / `unmapped` controls the icon-fill / hover / selected styling
+    // (still tied to whether there's an output binding). `led-on` is a
+    // separate flag for whether to render the colored ring.
+    classes.push(isMapped ? 'mapped' : 'unmapped');
+    if (ledOn) classes.push('led-on');
     if (btn.id === selectedBtnId) classes.push('selected');
 
     // Hover tooltip: "LF2 (L-Down)" for mapped buttons, "LF2" otherwise.
@@ -1915,7 +1930,7 @@ function buildControllerSVG() {
 
     // Outer ring (color comes from the --led-color custom property below)
     g.appendChild(svgEl('circle', { cx: btn.x, cy: btn.y, r: btn.r, class: 'btn-ring' }));
-    if (showRing && hasLED(btn.id)) {
+    if (ledOn && hasLED(btn.id)) {
       const stored = getButtonColor(profile, btn.id);
       // Rainbow modes: a button "participates" only if its stored color is
       // 0xFFFFFF. Indicate this with the shared rainbow-grad stroke.
@@ -3493,15 +3508,53 @@ function emptyMenuIconArray() {
   return ['OUT_UNSPECIFIED','OUT_UNSPECIFIED','OUT_UNSPECIFIED','OUT_UNSPECIFIED','OUT_UNSPECIFIED','OUT_UNSPECIFIED','OUT_UNSPECIFIED'];
 }
 
+// Snapshot whether a physical button currently has any kind of binding,
+// before mutating it. Used to decide whether `applyOutput` / key-capture
+// should auto-toggle the LED on (only on first assignment, not on
+// re-bindings — re-bindings preserve whatever colour the user has set).
+function buttonHasBinding(profile, btnId) {
+  if (btnId.startsWith('BTN_MB')) {
+    // MBs always count as bound — they have firmware defaults even when
+    // menuButtonIcon is OUT_UNSPECIFIED, and MB1 is non-remappable anyway.
+    return true;
+  }
+  if (isKeyboardProfile(profile)) {
+    return getButtonKeycode(profile, btnId) != null;
+  }
+  return resolveButtonOutput(btnId, profile, remapMap(profile)) != null;
+}
+
+// Called after a binding is written. If the button was unassigned before
+// (so we can guess the user is "turning it on" for the first time) and it
+// has an LED but no colour stored, set the LED to the default cyan.
+// Re-bindings preserve whatever the user already had (per the LED spec).
+function autoEnableLedOnAssign(profile, btnId, wasBound) {
+  if (wasBound) return;
+  if (!hasLED(btnId)) return;
+  if (getButtonColor(profile, btnId) !== 0) return;   // already on, don't clobber
+  setButtonColor(profile, btnId, DEFAULT_LED_COLOR_INT);
+}
+
+// Called after a binding is cleared (unmap / unbind). Turns the LED off on
+// any LED-capable button. MB1 has no off state on the device, so we skip it.
+function autoDisableLedOnUnassign(profile, btnId) {
+  if (!hasLED(btnId)) return;
+  if (NON_REMAPPABLE_BUTTONS.has(btnId)) return;
+  setButtonColor(profile, btnId, 0);
+}
+
 function applyOutput(outputId) {
   const profile = currentProfile();
   if (!profile || !selectedBtnId) { closeOutputPopup(); return; }
+
+  const wasBound = buttonHasBinding(profile, selectedBtnId);
 
   // Menu buttons: write to menuButtonIcon
   if (selectedBtnId.startsWith('BTN_MB')) {
     const mbIdx = parseInt(selectedBtnId.slice(6), 10) - 1;
     if (!profile.menuButtonIcon) profile.menuButtonIcon = emptyMenuIconArray();
     profile.menuButtonIcon[mbIdx] = OUTPUT_ID_TO_OUTPUT_OPTION[outputId] || 'OUT_UNSPECIFIED';
+    autoEnableLedOnAssign(profile, selectedBtnId, wasBound);
     closeOutputPopup();
     renderAll();
     return;
@@ -3513,6 +3566,7 @@ function applyOutput(outputId) {
   // from every slot in either array before writing the new binding.
   if (isCustomProfile(profile)) {
     setCustomButtonOutput(profile, selectedBtnId, outputId);
+    autoEnableLedOnAssign(profile, selectedBtnId, wasBound);
     closeOutputPopup();
     renderAll();
     return;
@@ -3523,6 +3577,7 @@ function applyOutput(outputId) {
   const phys = findPhysicalButtonForOutput(outputId, profile.modeId);
   if (!phys) { closeOutputPopup(); return; }
   setRemap(selectedBtnId, phys);
+  autoEnableLedOnAssign(profile, selectedBtnId, wasBound);
   closeOutputPopup();
   renderAll();
 }
@@ -3546,6 +3601,7 @@ function unmapSelected() {
     // Disable button: { physicalButton: BTN_X } with no activates.
     setRemap(selectedBtnId, null);
   }
+  autoDisableLedOnUnassign(profile, selectedBtnId);
   closeOutputPopup();
   renderAll();
 }
@@ -3913,15 +3969,34 @@ function wireSettingsHandlers() {
     const keyboardMode = isKeyboardProfile(p);
     const rmap = remapMap(p);
     for (const btn of BUTTON_LAYOUT) {
-      const active = keyboardMode
-        ? (getButtonKeycode(p, btn.id) != null)
-        : (resolveButtonOutput(btn.id, p, rmap) != null);
+      // MB1 is non-remappable but has an LED and is always "active" on the
+      // device — include it explicitly so Apply touches it too. Other LED-
+      // capable buttons follow the normal bound-output check.
+      const active = NON_REMAPPABLE_BUTTONS.has(btn.id)
+        || (keyboardMode
+              ? (getButtonKeycode(p, btn.id) != null)
+              : (resolveButtonOutput(btn.id, p, rmap) != null));
       if (active) setButtonColor(p, btn.id, colorInt);
     }
     buildControllerSVG();
   };
   $('btn-apply-rgb-static').addEventListener('click', applyRgbToMapped);
   $('btn-apply-rgb-rainbow').addEventListener('click', applyRgbToMapped);
+
+  // "Clear lighting" — set every LED-capable button (including MB1) to colour
+  // 0. The user can then bring individual LEDs back via the per-button popup
+  // (ON / colour picker) or re-Apply with a chosen colour.
+  const clearAllLeds = () => {
+    const p = currentProfile();
+    if (!p) return;
+    for (const btn of BUTTON_LAYOUT) {
+      if (!hasLED(btn.id)) continue;
+      setButtonColor(p, btn.id, 0);
+    }
+    buildControllerSVG();
+  };
+  $('btn-clear-rgb-static').addEventListener('click', clearAllLeds);
+  $('btn-clear-rgb-rainbow').addEventListener('click', clearAllLeds);
 
   $('btn-add-socd').addEventListener('click', () => {
     const p = currentProfile();
@@ -4274,7 +4349,9 @@ function wireToolbarHandlers() {
     if (hid == null) return;  // unsupported key; stay capturing
     const profile = currentProfile();
     if (!profile || !selectedBtnId) return;
+    const wasBound = buttonHasBinding(profile, selectedBtnId);
     setButtonKeycode(profile, selectedBtnId, hid);
+    autoEnableLedOnAssign(profile, selectedBtnId, wasBound);
     keyboardCapturing = false;
     const el = $('popup-keyboard-input');
     el.classList.remove('capturing');
@@ -4290,7 +4367,9 @@ function wireToolbarHandlers() {
   $('popup-keyboard-esc').addEventListener('click', () => {
     const profile = currentProfile();
     if (!profile || !selectedBtnId) return;
+    const wasBound = buttonHasBinding(profile, selectedBtnId);
     setButtonKeycode(profile, selectedBtnId, 41);
+    autoEnableLedOnAssign(profile, selectedBtnId, wasBound);
     keyboardCapturing = false;
     const el = $('popup-keyboard-input');
     el.classList.remove('capturing');
@@ -4299,7 +4378,9 @@ function wireToolbarHandlers() {
     if (isKeyboardProfile(profile)) renderRemapList(profile);
   });
 
-  $('popup-remove-lighting').addEventListener('click', () => {
+  // LED Off — write color 0 (firmware treats this as "LED unlit"). Updates
+  // the popup colour controls + the live SVG without rebuilding.
+  $('popup-led-off').addEventListener('click', () => {
     const profile = currentProfile();
     if (!profile || !selectedBtnId) return;
     closeHsvPicker();
@@ -4308,6 +4389,19 @@ function wireToolbarHandlers() {
     $('popup-color-hex').value = '#000000';
     $('popup-color-hex').classList.remove('invalid');
     applyLiveButtonColor(selectedBtnId, 0);
+  });
+  // LED On — write the default cyan colour. Pair with Off as a quick toggle
+  // for users who want the LED on without picking a specific colour.
+  $('popup-led-on').addEventListener('click', () => {
+    const profile = currentProfile();
+    if (!profile || !selectedBtnId) return;
+    closeHsvPicker();
+    setButtonColor(profile, selectedBtnId, DEFAULT_LED_COLOR_INT);
+    const hex = colorIntToHex(DEFAULT_LED_COLOR_INT);
+    $('popup-color-swatch').style.background = hex;
+    $('popup-color-hex').value = hex;
+    $('popup-color-hex').classList.remove('invalid');
+    applyLiveButtonColor(selectedBtnId, DEFAULT_LED_COLOR_INT);
   });
 
   // Rainbow-mode per-button toggles. The two buttons set the stored color to
