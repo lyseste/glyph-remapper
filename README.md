@@ -11,13 +11,12 @@
 ## Table of contents
 
 1. [Quick start](#quick-start)
-2. [Features](#features)
-3. [Project layout](#project-layout)
-4. [How the app talks to the device](#how-the-app-talks-to-the-device)
-5. [Data model](#data-model)
-6. [Mode system](#mode-system)
-7. [Custom mode](#custom-mode)
-8. [Contributing](#contributing)
+2. [Project layout](#project-layout)
+3. [How the app talks to the device](#how-the-app-talks-to-the-device)
+4. [Data model](#data-model)
+5. [Mode system](#mode-system)
+6. [Custom mode](#custom-mode)
+7. [Contributing](#contributing)
 
 ---
 
@@ -268,33 +267,13 @@ The Combination Mode is per-M-group (all axes in the group share it). Override i
 
 The proto's `AnalogAxis` includes `AXIS_LTRIGGER` and `AXIS_RTRIGGER` and the firmware does run them through the modifier loop, but the end of `CustomControllerMode::UpdateAnalogOutputs` has an unconditional digital-trigger force-override (`if (outputs.triggerLDigital) outputs.triggerLAnalog = 255`) that clobbers anything written earlier in the same frame. So a modifier on `AXIS_LTRIGGER` is effectively dead-letter whenever the underlying L button is bound — its effect disappears before it leaves the frame. The UI doesn't expose those axes; use analog trigger mappings (T-entries, below) for partial trigger presses instead.
 
-#### Worked example — 43° soft-drift modifier
-
-A common request: hold a modifier button and a diagonal direction, get a 43° angle from up (close to vertical, useful for Mario Kart soft-drifting).
-
-1. Click **+ Add Modifier** → an M1 row appears with all four stick axes pre-filled at `1.00`.
-2. Set **L-Stick X = 0.682** (= `sin(43°)`) and **L-Stick Y = 0.731** (= `cos(43°)`). Leave the right-stick axes at `1.00`.
-3. Bind M1 to a physical modifier button — either from the in-row dropdown or by clicking the **M1** glyph in the controller popup after selecting a button.
-4. Hold the modifier button + Up + Right → the analog stick lands at `(NEUTRAL + range × 0.682, NEUTRAL + range × 0.731)` = roughly `(196, 201)` with `stickRange = 100`, which is 43° from up at full magnitude.
-
-The mirror diagonals (Up-Left, Down-Right, Down-Left) automatically work because the modifier multiplies by `sign(current)`, so the directionality follows whichever D-pad direction is pressed.
-
 ### Analog triggers
 
 Each `AnalogTriggerMapping` entry is `(button, trigger: LT/RT, value: 0-255)`. While the button is held, the firmware sets the corresponding analog trigger to the configured value. Use these for partial trigger presses (Melee light shield ≈ 49, mid shield ≈ 94) without going through the modifier system.
 
 The configurator presents these as **T-entries** (T1, T2, …). Each row picks the trigger axis (`LT` or `RT`) and the value. The button is bound either via the in-row dropdown or via the **T{n}** glyph in the popup.
 
-### Binding workflow: two paths
-
-For both M-groups and T-entries, the user has two ways to assign a physical button:
-
-1. **In-row dropdown** in the M-group / T-entry header — picks directly from any non-MB physical button or `(unbound)`. This is the typical workflow when configuring the modifier itself.
-2. **Popup grid virtual outputs** — `M1, M2, …` and `T1, T2, …` glyphs appear in the controller popup alongside the standard digital outputs. Picking one of them binds the currently-selected phys to that modifier / trigger, just like picking `A` would bind to the A output.
-
-Both paths go through `setCustomButtonOutput`, which atomically clears any prior binding of the physical button before writing the new one. A physical button can be bound to a digital output **and** a modifier (and / or a trigger) simultaneously — the firmware processes them in separate passes, so all three fire when the button is held. The controller-button label shows the digital binding by priority; M / T bindings are only visible in the panel rows.
-
-### Persistence — empty bindings are safe
+### Persistence
 
 The firmware short-circuits two cases that the configurator relies on:
 
