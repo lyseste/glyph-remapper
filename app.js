@@ -1388,6 +1388,69 @@ function getCustomConfig(profile) {
   return config.customModes[idx] || null;
 }
 
+// Per-mode "default disables" — buttons that the built-in default profile for
+// each mode marks as unused. When a fresh profile (empty buttonRemapping) is
+// switched INTO a controller mode from CUSTOM, we apply these so the profile
+// starts in the same shape as the mode's default (no phantom D-pad on
+// LF6/LF7/LF8/LT6 in Ultimate etc.). Extracted from DEFAULT_CONFIG_JSON.
+const _COMMON_MODE_DISABLES = [
+  'BTN_LF5', 'BTN_LF6', 'BTN_LF7', 'BTN_LF8',
+  'BTN_LT3', 'BTN_LT4', 'BTN_LT5', 'BTN_LT6',
+  'BTN_RF9',  'BTN_RF10', 'BTN_RF11', 'BTN_RF12',
+  'BTN_RF13', 'BTN_RF14', 'BTN_RF15', 'BTN_RF16',
+  'BTN_MB1', 'BTN_MB2', 'BTN_MB3',
+];
+const MODE_DEFAULT_DISABLES = {
+  MODE_MELEE:            _COMMON_MODE_DISABLES,
+  MODE_PROJECT_M:        _COMMON_MODE_DISABLES,
+  MODE_ULTIMATE:         _COMMON_MODE_DISABLES,
+  MODE_RIVALS_OF_AETHER: _COMMON_MODE_DISABLES,
+  MODE_RIVALS2:          _COMMON_MODE_DISABLES,
+  MODE_64: [
+    ..._COMMON_MODE_DISABLES,
+    'BTN_RT2', 'BTN_RT3', 'BTN_RT4', 'BTN_RT5',
+    'BTN_MB4', 'BTN_MB5', 'BTN_MB6',
+  ],
+  MODE_FGC: [
+    'BTN_LF4', 'BTN_LF6', 'BTN_LF7', 'BTN_LF8',
+    'BTN_LT2', 'BTN_LT3', 'BTN_LT4', 'BTN_LT5', 'BTN_LT6',
+    'BTN_RF10', 'BTN_RF11', 'BTN_RF12', 'BTN_RF13',
+    'BTN_RF14', 'BTN_RF15', 'BTN_RF16',
+    'BTN_RT2', 'BTN_RT3', 'BTN_RT4', 'BTN_RT5',
+    'BTN_MB1', 'BTN_MB2', 'BTN_MB3',
+  ],
+};
+
+// Build a buttonRemapping array containing explicit-disable entries for the
+// given mode's conventional set of unused buttons. Returns [] for modes with
+// no known defaults (keyboard, custom, unspecified).
+function defaultButtonRemappingForMode(modeId) {
+  const btns = MODE_DEFAULT_DISABLES[modeId];
+  if (!btns) return [];
+  return btns.map(b => ({ physicalButton: b }));
+}
+
+// Materialise NEUTRAL SocdPair entries for every axis the current profile /
+// mode surfaces (Left X, Left Y, D-Pad X, D-Pad Y, Right X, Right Y). Only
+// axes whose button pair actually resolves in this mode get an entry; the
+// rest are left alone. Called after applying a fresh profile's mode defaults
+// so the axis rows show "Neutral" instead of "None" out of the gate.
+function seedNeutralSocdPairs(profile) {
+  if (!Array.isArray(profile.socdPairs)) profile.socdPairs = [];
+  for (const axis of SOCD_AXES) {
+    const pairs = axisButtonPairs(profile, axis);
+    for (const [a, b] of pairs) {
+      if (!findSocdPair(profile, a, b)) {
+        profile.socdPairs.push({
+          buttonDir1: a,
+          buttonDir2: b,
+          socdType: 'SOCD_NEUTRAL',
+        });
+      }
+    }
+  }
+}
+
 // MB1 is the hardware "open device menu" button — never remappable, but it has
 // an addressable LED so its color can still be customized.
 const NON_REMAPPABLE_BUTTONS = new Set(['BTN_MB1']);
@@ -1812,8 +1875,12 @@ function addProfile() {
     return;
   }
   if (!config.gameModeConfigs) config.gameModeConfigs = [];
+  // New profiles start as MODE_CUSTOM with an empty CustomModeConfig — no
+  // button mappings, no stick directions, no modifiers, no triggers. That
+  // gives a truly blank canvas; the user can switch to a specific mode
+  // afterwards if they want that mode's native template.
   const newProfile = {
-    modeId: 'MODE_MELEE',
+    modeId: 'MODE_CUSTOM',
     name: 'New Profile',
     socdPairs: [],
     buttonRemapping: [],
@@ -1824,6 +1891,10 @@ function addProfile() {
   };
   config.gameModeConfigs.push(newProfile);
   selectedProfileIdx = config.gameModeConfigs.length - 1;
+  // Attach the blank CustomModeConfig — sets customModeConfig index and
+  // pushes an entry onto Config.customModes[] with the standard defaults
+  // (stickRange 100, empty everything).
+  ensureCustomConfig(newProfile);
   renderAll();
 }
 
@@ -1834,6 +1905,56 @@ function deleteProfile(idx) {
     selectedProfileIdx = config.gameModeConfigs.length - 1;
   }
   renderAll();
+}
+
+// Reorder profiles by moving the entry at `fromIdx` to `toIdx` (0-based).
+// Also rewrites every communicationBackendConfigs[*].defaultModeConfig
+// (1-based, 0 = unset) so those references still point at the same profile
+// after the shift — the Glyph firmware uses this array's order for the
+// on-device profile list, so getting the indices right matters for both
+// saving to the device and for exporting JSON.
+function moveProfile(fromIdx, toIdx) {
+  if (!config?.gameModeConfigs) return;
+  const arr = config.gameModeConfigs;
+  if (fromIdx === toIdx) return;
+  if (fromIdx < 0 || fromIdx >= arr.length) return;
+  if (toIdx < 0   || toIdx   >= arr.length) return;
+
+  const [moved] = arr.splice(fromIdx, 1);
+  arr.splice(toIdx, 0, moved);
+
+  // Remap backend "default profile" references. defaultModeConfig is 1-based
+  // (0 = unset). See remapProfileIdx1 for the shift math.
+  for (const bc of (config.communicationBackendConfigs || [])) {
+    if (typeof bc.defaultModeConfig === 'number') {
+      bc.defaultModeConfig = remapProfileIdx1(bc.defaultModeConfig, fromIdx, toIdx);
+    }
+  }
+  // Keep the current selection tracking the same profile.
+  selectedProfileIdx = remapProfileIdx0(selectedProfileIdx, fromIdx, toIdx);
+  renderAll();
+}
+
+// Given a 1-based index into gameModeConfigs (0 = unset), return the new
+// 1-based index after moving the profile at `from` to `to` (both 0-based).
+function remapProfileIdx1(oldIdx1, from, to) {
+  if (oldIdx1 === 0) return 0;
+  const idx = oldIdx1 - 1;
+  if (idx === from) return to + 1;
+  // Moving down: entries in (from, to] shift up by one.
+  if (from < to && idx > from && idx <= to) return idx;
+  // Moving up: entries in [to, from) shift down by one.
+  if (from > to && idx >= to && idx < from) return idx + 2;
+  return oldIdx1;
+}
+
+// Same but for 0-based indices (e.g. selectedProfileIdx).
+function remapProfileIdx0(sel, from, to) {
+  if (sel < 0) return sel;
+  if (sel === from) return to;
+  if (from < to && sel > from && sel <= to) return sel - 1;
+  if (from > to && sel >= to && sel < from) return sel + 1;
+  return sel;
 }
 
 // ---------------------------------------------------------------------------
@@ -2150,6 +2271,7 @@ function renderProfileList() {
     const item = document.createElement('div');
     item.className = 'profile-item' + (i === selectedProfileIdx ? ' selected' : '');
     item.dataset.idx = i;
+    item.draggable = true;
 
     const modeShort = (p.modeId || 'MODE_UNSPECIFIED').replace('MODE_', '');
     item.innerHTML = `
@@ -2173,6 +2295,51 @@ function renderProfileList() {
       e.stopPropagation();
       openProfileContextMenu(i, e.clientX, e.clientY);
     });
+
+    // Drag-and-drop reorder. dragstart stashes the source index in
+    // dataTransfer; drop reads it back and calls moveProfile. The
+    // dragover/leave classes drive the drop-indicator styles (thin accent
+    // border above or below the target depending on drag direction).
+    item.addEventListener('dragstart', e => {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(i));
+      item.classList.add('dragging');
+    });
+    item.addEventListener('dragend', () => {
+      item.classList.remove('dragging');
+      list.querySelectorAll('.profile-item')
+        .forEach(el => el.classList.remove('drop-before', 'drop-after'));
+    });
+    item.addEventListener('dragover', e => {
+      // Suppress on the source item itself so it doesn't self-highlight.
+      if (item.classList.contains('dragging')) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const rect = item.getBoundingClientRect();
+      const before = (e.clientY - rect.top) < rect.height / 2;
+      item.classList.toggle('drop-before', before);
+      item.classList.toggle('drop-after', !before);
+    });
+    item.addEventListener('dragleave', () => {
+      item.classList.remove('drop-before', 'drop-after');
+    });
+    item.addEventListener('drop', e => {
+      e.preventDefault();
+      const fromIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+      const dropBefore = item.classList.contains('drop-before');
+      item.classList.remove('drop-before', 'drop-after');
+      if (Number.isNaN(fromIdx) || fromIdx === i) return;
+      // `i` is the target-item index. Drop-before means insert before it;
+      // drop-after means insert after. If moving down (fromIdx < i), the
+      // splice math means "insert after" is just i and "insert before" is
+      // i - 1. If moving up (fromIdx > i), "insert before" is i and "insert
+      // after" is i + 1.
+      let toIdx;
+      if (fromIdx < i) toIdx = dropBefore ? i - 1 : i;
+      else             toIdx = dropBefore ? i     : i + 1;
+      moveProfile(fromIdx, toIdx);
+    });
+
     list.appendChild(item);
   });
 
@@ -3838,10 +4005,44 @@ function wireSettingsHandlers() {
     // explicit-disable entries left over from the old mode would silently
     // turn off buttons the user expects to be able to bind. The custom-mode
     // editor itself doesn't use buttonRemapping, so there's no UI to surface
-    // those entries either. Switching OUT of CUSTOM leaves the config alone.
-    if (newMode === 'MODE_CUSTOM') {
+    // those entries either.
+    //
+    // The pre-CUSTOM buttonRemapping is stashed on the profile in a JS-only
+    // field (`_preCustomButtonRemapping` — starts with `_`, isn't in the
+    // proto schema so protobuf.js drops it on encode) so a round-trip like
+    // Melee → CUSTOM → Melee restores the original disables. Without this
+    // the mode's default disables (e.g. LF6/LF7/LF8/LT6 disabled in the
+    // Melee default profile) would be lost.
+    if (newMode === 'MODE_CUSTOM' && oldMode !== 'MODE_CUSTOM') {
       ensureCustomConfig(p);
+      p._preCustomButtonRemapping = Array.isArray(p.buttonRemapping)
+        ? JSON.parse(JSON.stringify(p.buttonRemapping))
+        : [];
+      p._preCustomModeId = oldMode;
       p.buttonRemapping = [];
+    } else if (oldMode === 'MODE_CUSTOM' && newMode !== 'MODE_CUSTOM') {
+      // Leaving CUSTOM. Three cases:
+      //  1. We have a snapshot AND the target mode matches the snapshot's
+      //     source mode → restore the exact snapshot (round-trip preserves
+      //     the user's original disables / remaps).
+      //  2. We have a snapshot but the target mode is different (e.g.
+      //     Melee → CUSTOM → Ultimate) → the snapshot's disables might not
+      //     make sense in the new mode, so fall through to the fresh path.
+      //  3. No snapshot (fresh profile that was CUSTOM from birth) → apply
+      //     the target mode's default disables so the profile matches the
+      //     built-in default (no phantom D-pad on LF6/LF7/LF8/LT6 in
+      //     Ultimate etc.) and seed NEUTRAL SocdPairs for every axis the
+      //     mode surfaces, so the axis rows default to Neutral not None.
+      const snap = p._preCustomButtonRemapping;
+      const snapMode = p._preCustomModeId;
+      if (snap && snap.length > 0 && snapMode === newMode) {
+        p.buttonRemapping = snap;
+      } else {
+        p.buttonRemapping = defaultButtonRemappingForMode(newMode);
+        seedNeutralSocdPairs(p);
+      }
+      delete p._preCustomButtonRemapping;
+      delete p._preCustomModeId;
     }
     // applicableBackends / menuButtonIcon / rgbConfig stay untouched.
     renderProfileList();
@@ -4023,7 +4224,10 @@ function wireSettingsHandlers() {
     const p = currentProfile();
     if (!p) return;
     if (!p.socdPairs) p.socdPairs = [];
-    p.socdPairs.push({ buttonDir1: 'BTN_LF3', buttonDir2: 'BTN_LF1', socdType: 'SOCD_2IP_NO_REAC' });
+    // Default to NEUTRAL — the common "cancel both" rule that most users
+    // want when they add a new pair. 2IP_NO_REAC is a fighter-specific
+    // choice and was a poor default here.
+    p.socdPairs.push({ buttonDir1: 'BTN_LF3', buttonDir2: 'BTN_LF1', socdType: 'SOCD_NEUTRAL' });
     renderSocdList(p);
   });
 
