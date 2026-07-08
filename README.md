@@ -374,6 +374,7 @@ Most of the app works fine without a Glyph plugged in — load defaults, edit, e
 - [GregTurbo/HayBox-proto](https://github.com/GregTurbo/HayBox-proto) — the configurator protobuf schema fork the Glyph uses.
 - [eric-wieser/PacketIO](https://github.com/eric-wieser/PacketIO) — the COBS framing library on the firmware side.
 - [Kenney](https://kenney.nl/) — gamepad button icons used in the controller display.
+- [Lucide](https://lucide.dev/) — the line-icon set (ISC licensed, forked from [Feather Icons](https://feathericons.com/)) used throughout the interface.
 
 ---
 
