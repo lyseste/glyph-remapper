@@ -293,12 +293,21 @@ function preserveOutputsAcrossModeChange(profile, oldMode, newMode) {
   // Keyboard mode bypasses buttonRemapping entirely (CustomKeyboardMode.cpp),
   // so there's nothing meaningful to convert across a keyboard transition.
   if (oldMode === 'MODE_KEYBOARD' || newMode === 'MODE_KEYBOARD') return;
-  // CUSTOM mode uses its own mapping table (CustomModeConfig.digitalButton-
-  // Mappings) instead of MODE_OUTPUT_MAP, so output-preservation across the
-  // boundary is meaningless — the new mode has no mode map to look outputs up
-  // in. Without this skip, every button gets explicitly disabled because no
-  // output id "exists" in CUSTOM's empty mode map.
-  if (oldMode === 'MODE_CUSTOM' || newMode === 'MODE_CUSTOM') return;
+  // CUSTOM ↔ controller transitions are translated separately: the CUSTOM
+  // binding format lives in customModeConfig.digital/stickDirectionMappings
+  // and MODE_OUTPUT_MAP has no entry for CUSTOM. Fall through to the shared
+  // controller-to-controller path only when both ends are non-CUSTOM.
+  if (oldMode !== 'MODE_CUSTOM' && newMode === 'MODE_CUSTOM') {
+    translateControllerToCustom(profile, oldMode);
+    return;
+  }
+  if (oldMode === 'MODE_CUSTOM' && newMode !== 'MODE_CUSTOM') {
+    translateCustomToController(profile, newMode);
+    return;
+  }
+  // Impossible in practice (mode-change handler bails on same-mode), but
+  // defensively bail if somehow both are CUSTOM.
+  if (oldMode === 'MODE_CUSTOM' && newMode === 'MODE_CUSTOM') return;
 
   const oldModeMap = MODE_OUTPUT_MAP[oldMode] || {};
   const newModeMap = MODE_OUTPUT_MAP[newMode] || {};
@@ -356,6 +365,103 @@ function preserveOutputsAcrossModeChange(profile, oldMode, newMode) {
     if (idx >= 0) profile.buttonRemapping[idx] = entry;
     else          profile.buttonRemapping.push(entry);
   }
+}
+
+// Controller mode → CUSTOM: walk every physical button's effective output
+// under the source controller mode and write it into the target profile's
+// CustomModeConfig (digitalButtonMappings / stickDirectionMappings). Outputs
+// the source mode surfaces that CUSTOM can't express (mx, my, rt_light,
+// rt_mid) are dropped — CUSTOM has no representation for them.
+function translateControllerToCustom(profile, oldMode) {
+  const oldModeMap = MODE_OUTPUT_MAP[oldMode] || {};
+  const cc = ensureCustomConfig(profile);
+  // Reset to blanks so a stale binding from a previous CUSTOM stint doesn't
+  // leak through. Keep other custom-mode data (stick range, modifiers,
+  // triggers, combo mappings) — those are user preferences unrelated to binds.
+  cc.digitalButtonMappings  = [];
+  cc.stickDirectionMappings = [];
+
+  const rmap = remapMap(profile);
+  for (const btn of BUTTON_LAYOUT) {
+    if (btn.id.startsWith('BTN_MB')) continue;
+    // Skip explicit disables: the user turned this button off on purpose.
+    const existing = profile.buttonRemapping?.find(r => r.physicalButton === btn.id);
+    if (existing && (!existing.activates || existing.activates === 'BTN_UNSPECIFIED')) continue;
+    const logical = resolveLogicalButton(btn.id, rmap);
+    if (!logical) continue;
+    const output = oldModeMap[logical];
+    if (!output) continue;
+
+    const digIdx = OUTPUT_ID_TO_DIGITAL_INDEX[output];
+    if (digIdx !== undefined) {
+      while (cc.digitalButtonMappings.length <= digIdx) cc.digitalButtonMappings.push('BTN_UNSPECIFIED');
+      cc.digitalButtonMappings[digIdx] = btn.id;
+      continue;
+    }
+    const stkIdx = OUTPUT_ID_TO_STICK_INDEX[output];
+    if (stkIdx !== undefined) {
+      while (cc.stickDirectionMappings.length <= stkIdx) cc.stickDirectionMappings.push('BTN_UNSPECIFIED');
+      cc.stickDirectionMappings[stkIdx] = btn.id;
+    }
+    // Other outputs (mx / my / rt_light / rt_mid) have no CUSTOM slot — drop.
+  }
+}
+
+// CUSTOM → controller: translate the profile's CustomModeConfig (digital-
+// ButtonMappings / stickDirectionMappings) into buttonRemapping entries that
+// produce the same physical-button → output association under the new
+// controller mode's map. Buttons that would produce output under the new
+// mode's defaults but are NOT bound in CUSTOM get explicit-disable entries so
+// no phantom output leaks in from the mode-map defaults.
+function translateCustomToController(profile, newMode) {
+  const newModeMap = MODE_OUTPUT_MAP[newMode] || {};
+  const cc = getCustomConfig(profile);
+  const digital = cc?.digitalButtonMappings  || [];
+  const stick   = cc?.stickDirectionMappings || [];
+
+  // Reverse index the new mode map: outputId → first physical button that
+  // natively produces it. First-wins keeps the data clean (no redundant remaps).
+  const outputToPhys = {};
+  for (const [phys, out] of Object.entries(newModeMap)) {
+    if (!(out in outputToPhys)) outputToPhys[out] = phys;
+  }
+
+  const remap = [];
+  const bound = new Set();  // physical buttons the user bound in CUSTOM
+  const addBind = (physBtn, output) => {
+    if (!physBtn || physBtn === 'BTN_UNSPECIFIED') return;
+    bound.add(physBtn);
+    const target = outputToPhys[output];
+    if (!target) {
+      // Output doesn't exist in the new mode. Explicit-disable so the physical
+      // button doesn't accidentally activate the new mode's native default.
+      remap.push({ physicalButton: physBtn });
+      return;
+    }
+    if (newModeMap[physBtn] === output) return;   // native default matches — no entry
+    remap.push({ physicalButton: physBtn, activates: target });
+  };
+
+  for (let i = 0; i < digital.length; i++) {
+    const out = DIGITAL_OUTPUT_TO_OUTPUT_ID[i];
+    if (out) addBind(digital[i], out);
+  }
+  for (let i = 0; i < stick.length; i++) {
+    const out = STICK_DIR_TO_OUTPUT_ID[i];
+    if (out) addBind(stick[i], out);
+  }
+
+  // CUSTOM's "unmapped = no output" is stricter than controller-mode defaults.
+  // Every non-menu button in the new mode's map that isn't bound in CUSTOM
+  // gets explicit-disabled so its native mode default doesn't leak through.
+  for (const phys of Object.keys(newModeMap)) {
+    if (phys.startsWith('BTN_MB')) continue;
+    if (bound.has(phys)) continue;
+    if (remap.find(r => r.physicalButton === phys)) continue;
+    remap.push({ physicalButton: phys });
+  }
+
+  profile.buttonRemapping = remap;
 }
 
 // Menu buttons (MB4-MB7) get their outputs hardcoded by the firmware regardless
@@ -977,8 +1083,9 @@ async function ensureProtobuf() {
 
 function configToBinary(cfg) {
   // Strip color entries for buttons with no physical LED (MB2-MB7) so they
-  // never reach the device.
-  const safeCfg = stripDisabledLeds(cfg);
+  // never reach the device, and scrub cross-field violations that firmware
+  // validates (see sanitizeConfigForEncode).
+  const safeCfg = sanitizeConfigForEncode(stripDisabledLeds(cfg));
   const Config = pbRoot.lookupType('Config');
   const msg = Config.fromObject(safeCfg);
   const err = Config.verify(msg);
@@ -1178,7 +1285,7 @@ function loadDefaultConfig() {
 // ---------------------------------------------------------------------------
 function exportConfig() {
   if (!config) { alert('No config loaded.'); return; }
-  const safeCfg = stripDisabledLeds(config);
+  const safeCfg = sanitizeConfigForEncode(stripDisabledLeds(config));
   const blob = new Blob([JSON.stringify(safeCfg, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -1386,48 +1493,6 @@ function getCustomConfig(profile) {
   const idx = (profile.customModeConfig || 0) - 1;
   if (idx < 0) return null;
   return config.customModes[idx] || null;
-}
-
-// Per-mode "default disables" — buttons that the built-in default profile for
-// each mode marks as unused. When a fresh profile (empty buttonRemapping) is
-// switched INTO a controller mode from CUSTOM, we apply these so the profile
-// starts in the same shape as the mode's default (no phantom D-pad on
-// LF6/LF7/LF8/LT6 in Ultimate etc.). Extracted from DEFAULT_CONFIG_JSON.
-const _COMMON_MODE_DISABLES = [
-  'BTN_LF5', 'BTN_LF6', 'BTN_LF7', 'BTN_LF8',
-  'BTN_LT3', 'BTN_LT4', 'BTN_LT5', 'BTN_LT6',
-  'BTN_RF9',  'BTN_RF10', 'BTN_RF11', 'BTN_RF12',
-  'BTN_RF13', 'BTN_RF14', 'BTN_RF15', 'BTN_RF16',
-  'BTN_MB1', 'BTN_MB2', 'BTN_MB3',
-];
-const MODE_DEFAULT_DISABLES = {
-  MODE_MELEE:            _COMMON_MODE_DISABLES,
-  MODE_PROJECT_M:        _COMMON_MODE_DISABLES,
-  MODE_ULTIMATE:         _COMMON_MODE_DISABLES,
-  MODE_RIVALS_OF_AETHER: _COMMON_MODE_DISABLES,
-  MODE_RIVALS2:          _COMMON_MODE_DISABLES,
-  MODE_64: [
-    ..._COMMON_MODE_DISABLES,
-    'BTN_RT2', 'BTN_RT3', 'BTN_RT4', 'BTN_RT5',
-    'BTN_MB4', 'BTN_MB5', 'BTN_MB6',
-  ],
-  MODE_FGC: [
-    'BTN_LF4', 'BTN_LF6', 'BTN_LF7', 'BTN_LF8',
-    'BTN_LT2', 'BTN_LT3', 'BTN_LT4', 'BTN_LT5', 'BTN_LT6',
-    'BTN_RF10', 'BTN_RF11', 'BTN_RF12', 'BTN_RF13',
-    'BTN_RF14', 'BTN_RF15', 'BTN_RF16',
-    'BTN_RT2', 'BTN_RT3', 'BTN_RT4', 'BTN_RT5',
-    'BTN_MB1', 'BTN_MB2', 'BTN_MB3',
-  ],
-};
-
-// Build a buttonRemapping array containing explicit-disable entries for the
-// given mode's conventional set of unused buttons. Returns [] for modes with
-// no known defaults (keyboard, custom, unspecified).
-function defaultButtonRemappingForMode(modeId) {
-  const btns = MODE_DEFAULT_DISABLES[modeId];
-  if (!btns) return [];
-  return btns.map(b => ({ physicalButton: b }));
 }
 
 // Materialise NEUTRAL SocdPair entries for every axis the current profile /
@@ -1765,6 +1830,30 @@ function stripDisabledLeds(cfg) {
   return clone;
 }
 
+// Firmware (ConfiguratorBackend.cpp) rejects any config where:
+//  - a profile's mode_id is not MODE_CUSTOM but custom_mode_config > 0
+//  - a profile's mode_id is not MODE_KEYBOARD but keyboard_mode_config > 0
+//  - a backend's default_mode_config points past gameModeConfigs.length
+// Any of those slips through easily (mode change forgets to clear the
+// pointer, delete-profile doesn't remap backend defaults, imported JSON is
+// stale, etc.). Rather than fix every mutation path, scrub at the encode
+// boundary so no invalid config reaches the device or a JSON export.
+function sanitizeConfigForEncode(cfg) {
+  const modeCount = cfg?.gameModeConfigs?.length ?? 0;
+
+  for (const p of (cfg?.gameModeConfigs || [])) {
+    if (p.modeId !== 'MODE_CUSTOM'   && p.customModeConfig)   p.customModeConfig   = 0;
+    if (p.modeId !== 'MODE_KEYBOARD' && p.keyboardModeConfig) p.keyboardModeConfig = 0;
+  }
+
+  for (const bc of (cfg?.communicationBackendConfigs || [])) {
+    if (typeof bc.defaultModeConfig === 'number' && bc.defaultModeConfig > modeCount) {
+      bc.defaultModeConfig = 0;
+    }
+  }
+  return cfg;
+}
+
 // Live-update the ring stroke for a single button without rebuilding the whole SVG.
 // The .btn-ring stroke reads from --led-color via CSS, so we set the custom
 // property on the group element (inline style — overrides CSS rules). Also
@@ -1928,6 +2017,16 @@ function addProfile() {
 function deleteProfile(idx) {
   if (!config?.gameModeConfigs) return;
   config.gameModeConfigs.splice(idx, 1);
+
+  // Rewrite backend defaultModeConfig (1-based, 0 = unset) so pointers still
+  // reference the same profile after the splice, or clear if they pointed at
+  // the deleted one. Firmware rejects out-of-range pointers on save.
+  for (const bc of (config.communicationBackendConfigs || [])) {
+    if (typeof bc.defaultModeConfig !== 'number' || bc.defaultModeConfig === 0) continue;
+    if (bc.defaultModeConfig === idx + 1)     bc.defaultModeConfig = 0;
+    else if (bc.defaultModeConfig >  idx + 1) bc.defaultModeConfig -= 1;
+  }
+
   if (selectedProfileIdx >= config.gameModeConfigs.length) {
     selectedProfileIdx = config.gameModeConfigs.length - 1;
   }
@@ -4068,52 +4167,28 @@ function wireSettingsHandlers() {
     }
 
     p.modeId = newMode;
-    // Entering CUSTOM creates a blank CustomModeConfig if the profile doesn't
-    // already point at one (1-based index, matches the rgbConfig pattern).
-    // We also clear buttonRemapping — CustomControllerMode goes through the
-    // same HandleRemap as other modes (it inherits from ControllerMode), so
-    // explicit-disable entries left over from the old mode would silently
-    // turn off buttons the user expects to be able to bind. The custom-mode
-    // editor itself doesn't use buttonRemapping, so there's no UI to surface
-    // those entries either.
-    //
-    // The pre-CUSTOM buttonRemapping is stashed on the profile in a JS-only
-    // field (`_preCustomButtonRemapping` — starts with `_`, isn't in the
-    // proto schema so protobuf.js drops it on encode) so a round-trip like
-    // Melee → CUSTOM → Melee restores the original disables. Without this
-    // the mode's default disables (e.g. LF6/LF7/LF8/LT6 disabled in the
-    // Melee default profile) would be lost.
+    // Entering CUSTOM: preserveOutputsAcrossModeChange has already written
+    // this profile's effective binds into customModeConfig via
+    // translateControllerToCustom. Now clear buttonRemapping — CUSTOM goes
+    // through the same HandleRemap (inherits from ControllerMode), so leftover
+    // explicit-disables from the source mode would silently turn off buttons
+    // the user expects to be able to bind under CUSTOM.
     if (newMode === 'MODE_CUSTOM' && oldMode !== 'MODE_CUSTOM') {
-      ensureCustomConfig(p);
-      p._preCustomButtonRemapping = Array.isArray(p.buttonRemapping)
-        ? JSON.parse(JSON.stringify(p.buttonRemapping))
-        : [];
-      p._preCustomModeId = oldMode;
       p.buttonRemapping = [];
-    } else if (oldMode === 'MODE_CUSTOM' && newMode !== 'MODE_CUSTOM') {
-      // Leaving CUSTOM. Three cases:
-      //  1. We have a snapshot AND the target mode matches the snapshot's
-      //     source mode → restore the exact snapshot (round-trip preserves
-      //     the user's original disables / remaps).
-      //  2. We have a snapshot but the target mode is different (e.g.
-      //     Melee → CUSTOM → Ultimate) → the snapshot's disables might not
-      //     make sense in the new mode, so fall through to the fresh path.
-      //  3. No snapshot (fresh profile that was CUSTOM from birth) → apply
-      //     the target mode's default disables so the profile matches the
-      //     built-in default (no phantom D-pad on LF6/LF7/LF8/LT6 in
-      //     Ultimate etc.) and seed NEUTRAL SocdPairs for every axis the
-      //     mode surfaces, so the axis rows default to Neutral not None.
-      const snap = p._preCustomButtonRemapping;
-      const snapMode = p._preCustomModeId;
-      if (snap && snap.length > 0 && snapMode === newMode) {
-        p.buttonRemapping = snap;
-      } else {
-        p.buttonRemapping = defaultButtonRemappingForMode(newMode);
-        seedNeutralSocdPairs(p);
-      }
-      delete p._preCustomButtonRemapping;
-      delete p._preCustomModeId;
     }
+    // Leaving CUSTOM: translateCustomToController has already written the
+    // buttonRemapping entries needed to preserve the CUSTOM binds. Only extra
+    // work is seeding NEUTRAL SocdPairs if the profile has none — so the axis
+    // rows default to Neutral, not "None", when the user arrives at the new
+    // controller mode's SOCD panel.
+    if (oldMode === 'MODE_CUSTOM' && newMode !== 'MODE_CUSTOM'
+        && (!Array.isArray(p.socdPairs) || p.socdPairs.length === 0)) {
+      seedNeutralSocdPairs(p);
+    }
+    // Legacy snapshot fields from older versions of this handler — strip on
+    // any mode change so they can't accidentally reach the wire.
+    delete p._preCustomButtonRemapping;
+    delete p._preCustomModeId;
     // applicableBackends / menuButtonIcon / rgbConfig stay untouched.
     renderProfileList();
     renderSettingsPanel();   // toggle backends/remap visibility
@@ -4415,45 +4490,57 @@ function applyPresetToProfile(profile, presetName) {
   const preset = defaults.gameModeConfigs?.find(p => p?.name === presetName);
   if (!preset) return;
 
-  const oldMode = profile.modeId;
-  const newMode = preset.modeId;
+  const targetMode = profile.modeId;
+  const presetMode = preset.modeId;
 
-  // Clean up CUSTOM-mode transit state if we're leaving CUSTOM via the preset
-  // apply (matches the mode-change handler's exit-CUSTOM cleanup).
-  if (oldMode === 'MODE_CUSTOM' && newMode !== 'MODE_CUSTOM') {
-    delete profile._preCustomButtonRemapping;
-    delete profile._preCustomModeId;
-  }
-  // Same for keyboard-mode backend triplet, if the transition crosses it.
-  if (newMode === 'MODE_KEYBOARD' && oldMode !== 'MODE_KEYBOARD') {
-    profile.applicableBackends = ['COMMS_BACKEND_DINPUT'];
-  } else if (oldMode === 'MODE_KEYBOARD' && newMode !== 'MODE_KEYBOARD') {
-    profile.applicableBackends = [...(preset.applicableBackends || USB_BACKENDS)];
-  } else {
-    profile.applicableBackends = [...(preset.applicableBackends || [])];
-  }
-
-  profile.modeId          = newMode;
-  profile.buttonRemapping = JSON.parse(JSON.stringify(preset.buttonRemapping || []));
-  profile.socdPairs       = JSON.parse(JSON.stringify(preset.socdPairs       || []));
-  profile.menuButtonIcon  = [...(preset.menuButtonIcon || [
+  // SOCD pairs, menu-button icons, and backends come from the preset directly —
+  // they aren't mode-specific in a way that requires translation. Keyboard
+  // profiles keep DInput-only regardless of the preset.
+  profile.socdPairs      = JSON.parse(JSON.stringify(preset.socdPairs || []));
+  profile.menuButtonIcon = [...(preset.menuButtonIcon || [
     'OUT_UNSPECIFIED','OUT_UNSPECIFIED','OUT_UNSPECIFIED','OUT_UNSPECIFIED',
     'OUT_HOME','OUT_XB_BACK','OUT_START',
   ])];
+  profile.applicableBackends = targetMode === 'MODE_KEYBOARD'
+    ? ['COMMS_BACKEND_DINPUT']
+    : [...(preset.applicableBackends || USB_BACKENDS)];
 
-  // Keyboard preset also brings its keycode mappings.
-  if (newMode === 'MODE_KEYBOARD') {
-    const srcKb = defaults.keyboardModes?.[(preset.keyboardModeConfig || 0) - 1];
-    if (srcKb) {
-      const dstKb = ensureKeyboardConfig(profile);
-      dstKb.buttonsToKeycodes = JSON.parse(JSON.stringify(srcKb.buttonsToKeycodes || []));
+  // Button binds: transfer into the target profile's own mode format. If the
+  // modes match, copy verbatim. Otherwise translate via the same helper used
+  // by mode-switching, which knows how to move binds between CUSTOM and each
+  // controller mode. Keyboard is a separate domain — we only transfer binds
+  // when both ends are keyboard.
+  if (targetMode === presetMode) {
+    if (targetMode === 'MODE_KEYBOARD') {
+      const srcKb = defaults.keyboardModes?.[(preset.keyboardModeConfig || 0) - 1];
+      if (srcKb) {
+        const dstKb = ensureKeyboardConfig(profile);
+        dstKb.buttonsToKeycodes = JSON.parse(JSON.stringify(srcKb.buttonsToKeycodes || []));
+      }
+    } else {
+      profile.buttonRemapping = JSON.parse(JSON.stringify(preset.buttonRemapping || []));
+    }
+  } else if (presetMode !== 'MODE_KEYBOARD' && targetMode !== 'MODE_KEYBOARD') {
+    // Cross-mode preset apply: install the preset's controller-mode binds
+    // onto the profile temporarily, then run the shared translation. The
+    // profile keeps its own modeId — translation only touches the binding
+    // fields (buttonRemapping and, for CUSTOM targets, customModeConfig).
+    profile.buttonRemapping = JSON.parse(JSON.stringify(preset.buttonRemapping || []));
+    preserveOutputsAcrossModeChange(profile, presetMode, targetMode);
+    if (targetMode === 'MODE_CUSTOM') {
+      // Translation wrote into customModeConfig; buttonRemapping was the input
+      // and is now residual. CUSTOM must not carry buttonRemapping entries
+      // (see mode-change handler for the reason).
+      profile.buttonRemapping = [];
     }
   }
+  // Any remaining case (keyboard preset on non-keyboard target, or vice versa)
+  // leaves the profile's binds untouched — keyboard binds are HID keycodes
+  // which don't translate meaningfully to controller output ids.
 
   // Light up the newly-active buttons with the profile's default LED colour
   // (same behaviour as clicking "Apply to active" in Button Lighting) so the
-  // preset gives a visually complete result, not just the binds. Uses the
-  // profile's existing default colour if set, else the app-wide default cyan.
+  // preset gives a visually complete result, not just the binds.
   const rgb = ensureRgbConfig(profile);
   const defaultColor = (rgb.defaultColor != null ? Number(rgb.defaultColor) >>> 0 : DEFAULT_LED_COLOR_INT);
   paintActiveButtons(profile, defaultColor);
