@@ -380,6 +380,17 @@ function translateControllerToCustom(profile, oldMode) {
   // triggers, combo mappings) — those are user preferences unrelated to binds.
   cc.digitalButtonMappings  = [];
   cc.stickDirectionMappings = [];
+  // Additional-bind entries produced along the way; installed after primaries.
+  const additionalRemaps = [];
+
+  const setDigital = (idx, btn) => {
+    while (cc.digitalButtonMappings.length <= idx) cc.digitalButtonMappings.push('BTN_UNSPECIFIED');
+    cc.digitalButtonMappings[idx] = btn;
+  };
+  const setStick = (idx, btn) => {
+    while (cc.stickDirectionMappings.length <= idx) cc.stickDirectionMappings.push('BTN_UNSPECIFIED');
+    cc.stickDirectionMappings[idx] = btn;
+  };
 
   const rmap = remapMap(profile);
   for (const btn of BUTTON_LAYOUT) {
@@ -394,17 +405,36 @@ function translateControllerToCustom(profile, oldMode) {
 
     const digIdx = OUTPUT_ID_TO_DIGITAL_INDEX[output];
     if (digIdx !== undefined) {
-      while (cc.digitalButtonMappings.length <= digIdx) cc.digitalButtonMappings.push('BTN_UNSPECIFIED');
-      cc.digitalButtonMappings[digIdx] = btn.id;
+      const existingPrimary = cc.digitalButtonMappings[digIdx];
+      if (!existingPrimary || existingPrimary === 'BTN_UNSPECIFIED') {
+        setDigital(digIdx, btn.id);
+      } else if (existingPrimary !== btn.id) {
+        // Source mode had multiple buttons producing this output — preserve
+        // the many-to-one binding as an additional-bind remap.
+        additionalRemaps.push({ physicalButton: btn.id, activates: existingPrimary });
+      }
       continue;
     }
     const stkIdx = OUTPUT_ID_TO_STICK_INDEX[output];
     if (stkIdx !== undefined) {
-      while (cc.stickDirectionMappings.length <= stkIdx) cc.stickDirectionMappings.push('BTN_UNSPECIFIED');
-      cc.stickDirectionMappings[stkIdx] = btn.id;
+      const existingPrimary = cc.stickDirectionMappings[stkIdx];
+      if (!existingPrimary || existingPrimary === 'BTN_UNSPECIFIED') {
+        setStick(stkIdx, btn.id);
+      } else if (existingPrimary !== btn.id) {
+        additionalRemaps.push({ physicalButton: btn.id, activates: existingPrimary });
+      }
+      continue;
     }
     // Other outputs (mx / my / rt_light / rt_mid) have no CUSTOM slot — drop.
   }
+
+  // Merge additional-bind entries into buttonRemapping. Drop any prior entry
+  // for the same physicalButton to avoid duplicates from previous stints.
+  const existing = Array.isArray(profile.buttonRemapping) ? profile.buttonRemapping : [];
+  const additionalPhys = new Set(additionalRemaps.map(r => r.physicalButton));
+  profile.buttonRemapping = existing
+    .filter(r => !additionalPhys.has(r.physicalButton))
+    .concat(additionalRemaps);
 }
 
 // CUSTOM → controller: translate the profile's CustomModeConfig (digital-
@@ -418,6 +448,21 @@ function translateCustomToController(profile, newMode) {
   const cc = getCustomConfig(profile);
   const digital = cc?.digitalButtonMappings  || [];
   const stick   = cc?.stickDirectionMappings || [];
+
+  // Look up each CUSTOM primary's output so we can honour CUSTOM's additional-
+  // binding entries: `{X, activates: Y}` in CUSTOM means "X fires whatever Y
+  // fires". We need to know what Y fires to write X's entry in the new mode.
+  const primaryOutput = {};   // physBtn → outputId
+  for (let i = 0; i < digital.length; i++) {
+    const out = DIGITAL_OUTPUT_TO_OUTPUT_ID[i];
+    const b = digital[i];
+    if (out && b && b !== 'BTN_UNSPECIFIED' && !(b in primaryOutput)) primaryOutput[b] = out;
+  }
+  for (let i = 0; i < stick.length; i++) {
+    const out = STICK_DIR_TO_OUTPUT_ID[i];
+    const b = stick[i];
+    if (out && b && b !== 'BTN_UNSPECIFIED' && !(b in primaryOutput)) primaryOutput[b] = out;
+  }
 
   // Reverse index the new mode map: outputId → first physical button that
   // natively produces it. First-wins keeps the data clean (no redundant remaps).
@@ -449,6 +494,18 @@ function translateCustomToController(profile, newMode) {
   for (let i = 0; i < stick.length; i++) {
     const out = STICK_DIR_TO_OUTPUT_ID[i];
     if (out) addBind(stick[i], out);
+  }
+
+  // CUSTOM's additional-binding entries: `{X, activates: Y}` where Y is a
+  // primary. Resolve Y's output through primaryOutput and add X as another
+  // button firing the same output in the new mode. Skip entries whose target
+  // isn't a valid CUSTOM primary (dead-letter — sanitize will normally drop
+  // these but be robust).
+  for (const r of (profile.buttonRemapping || [])) {
+    if (!r.activates || r.activates === 'BTN_UNSPECIFIED') continue;   // explicit-disable, drop
+    const out = primaryOutput[r.activates];
+    if (!out) continue;
+    addBind(r.physicalButton, out);
   }
 
   // CUSTOM's "unmapped = no output" is stricter than controller-mode defaults.
@@ -1838,12 +1895,31 @@ function stripDisabledLeds(cfg) {
 // pointer, delete-profile doesn't remap backend defaults, imported JSON is
 // stale, etc.). Rather than fix every mutation path, scrub at the encode
 // boundary so no invalid config reaches the device or a JSON export.
+// Drop buttonRemapping entries that don't make sense in CUSTOM mode:
+//   * explicit-disable entries (no `activates`), which would silently kill
+//     buttons the user then binds via digital/stick mappings
+//   * "additional-binding" entries whose `activates` target isn't a primary
+//     in digital/stick mappings, i.e. dead-letters that don't fire anything
+// Called on CUSTOM entry (in place of the older "wipe everything" behaviour)
+// and again at encode time as a defense-in-depth clamp.
+function sanitizeCustomButtonRemapping(profile) {
+  if (!Array.isArray(profile.buttonRemapping) || profile.buttonRemapping.length === 0) return;
+  const cc = getCustomConfig(profile);
+  const primaries = new Set();
+  for (const b of (cc?.digitalButtonMappings  || [])) if (b && b !== 'BTN_UNSPECIFIED') primaries.add(b);
+  for (const b of (cc?.stickDirectionMappings || [])) if (b && b !== 'BTN_UNSPECIFIED') primaries.add(b);
+  profile.buttonRemapping = profile.buttonRemapping.filter(r =>
+    r.activates && r.activates !== 'BTN_UNSPECIFIED' && primaries.has(r.activates)
+  );
+}
+
 function sanitizeConfigForEncode(cfg) {
   const modeCount = cfg?.gameModeConfigs?.length ?? 0;
 
   for (const p of (cfg?.gameModeConfigs || [])) {
     if (p.modeId !== 'MODE_CUSTOM'   && p.customModeConfig)   p.customModeConfig   = 0;
     if (p.modeId !== 'MODE_KEYBOARD' && p.keyboardModeConfig) p.keyboardModeConfig = 0;
+    if (p.modeId === 'MODE_CUSTOM') sanitizeCustomButtonRemapping(p);
   }
 
   for (const bc of (cfg?.communicationBackendConfigs || [])) {
@@ -3912,10 +3988,15 @@ function applyOutput(outputId) {
 
   // CUSTOM mode: write the physical button id directly into the right slot
   // of digitalButtonMappings[] or stickDirectionMappings[]. Each physical
-  // button is allowed to drive at most one output, so we first clear it
-  // from every slot in either array before writing the new binding.
+  // button is allowed to drive at most one output, so setCustomButtonOutput
+  // first clears it from every slot before writing the new binding. Passing
+  // mode='additional' matches how controller-mode remaps work: if another
+  // button is already the primary for this output, add the current button as
+  // a duplicate binding (both fire the output) rather than moving. When the
+  // output is unbound or already primary'd by this same button, the helper
+  // silently falls back to 'primary' — no-op or first-time assignment.
   if (isCustomProfile(profile)) {
-    setCustomButtonOutput(profile, selectedBtnId, outputId);
+    setCustomButtonOutput(profile, selectedBtnId, outputId, 'additional');
     autoEnableLedOnAssign(profile, selectedBtnId, wasBound);
     closeOutputPopup();
     renderAll();
@@ -3969,9 +4050,54 @@ function unmapSelected() {
 // write its id into the new slot, padding the array with BTN_UNSPECIFIED if
 // the target index is beyond the array's current length.
 
-function setCustomButtonOutput(profile, btnId, outputId) {
+// Return the physical button that currently owns the primary slot for a
+// digital or stick output in CUSTOM mode. Returns null if the slot is empty
+// or the output isn't one of the primary-slot outputs (modifier / trigger
+// outputs don't use this pattern).
+function customPrimaryForOutput(cc, outputId) {
+  if (!cc) return null;
+  if (outputId in OUTPUT_ID_TO_DIGITAL_INDEX) {
+    const b = cc.digitalButtonMappings?.[OUTPUT_ID_TO_DIGITAL_INDEX[outputId]];
+    return (b && b !== 'BTN_UNSPECIFIED') ? b : null;
+  }
+  if (outputId in OUTPUT_ID_TO_STICK_INDEX) {
+    const b = cc.stickDirectionMappings?.[OUTPUT_ID_TO_STICK_INDEX[outputId]];
+    return (b && b !== 'BTN_UNSPECIFIED') ? b : null;
+  }
+  return null;
+}
+
+// setCustomButtonOutput mode selector:
+//   'primary'    (default) — this button becomes the primary for the output;
+//                             any prior primary is removed.
+//   'additional' — this button also fires the output alongside whichever
+//                  button is already the primary. Only valid for digital /
+//                  stick outputs; silently falls back to 'primary' for
+//                  modifier / trigger outputs (which have their own group
+//                  semantics), or when no primary exists yet, or when the
+//                  requested button is already the primary.
+function setCustomButtonOutput(profile, btnId, outputId, mode = 'primary') {
   const cc = ensureCustomConfig(profile);
   if (!cc) return;
+
+  if (mode === 'additional'
+      && (outputId in OUTPUT_ID_TO_DIGITAL_INDEX || outputId in OUTPUT_ID_TO_STICK_INDEX)) {
+    const primary = customPrimaryForOutput(cc, outputId);
+    if (primary && primary !== btnId) {
+      // Detach btnId from anywhere it was previously bound, then add a
+      // buttonRemapping entry that funnels its press into the primary's bit.
+      // The firmware's HandleRemap (CustomControllerMode inherits it from
+      // ControllerMode) will OR the two together, so both physical buttons
+      // trigger the output.
+      clearCustomButtonBinding(profile, btnId);
+      if (!Array.isArray(profile.buttonRemapping)) profile.buttonRemapping = [];
+      profile.buttonRemapping.push({ physicalButton: btnId, activates: primary });
+      return;
+    }
+    // No existing primary (or same button asking to be re-added as primary);
+    // fall through and let the primary path handle it.
+  }
+
   clearCustomButtonBinding(profile, btnId);
 
   if (outputId in OUTPUT_ID_TO_DIGITAL_INDEX) {
@@ -4010,19 +4136,46 @@ function setCustomButtonOutput(profile, btnId, outputId) {
 function clearCustomButtonBinding(profile, btnId) {
   const cc = getCustomConfig(profile);
   if (!cc) return;
-  if (Array.isArray(cc.digitalButtonMappings)) {
-    for (let i = 0; i < cc.digitalButtonMappings.length; i++) {
-      if (cc.digitalButtonMappings[i] === btnId) {
-        cc.digitalButtonMappings[i] = 'BTN_UNSPECIFIED';
+
+  // If btnId is a PRIMARY for a digital or stick slot AND other buttons have
+  // additional-binding remaps pointing at it (`{X, activates: btnId}`),
+  // promote one of them to the primary slot so those additional bindings
+  // don't silently break when the primary is cleared. Any remaining remaps
+  // get repointed at the promoted button.
+  const remap = Array.isArray(profile.buttonRemapping) ? profile.buttonRemapping : [];
+  const findFirstDependent = () =>
+    remap.find(r => r.physicalButton !== btnId && r.activates === btnId)?.physicalButton;
+
+  const clearAndPromote = (arr) => {
+    if (!Array.isArray(arr)) return;
+    for (let i = 0; i < arr.length; i++) {
+      if (arr[i] !== btnId) continue;
+      const heir = findFirstDependent();
+      if (heir) {
+        arr[i] = heir;
+        // Drop the heir's own remap (it's now the primary) and repoint any
+        // other dependents at the heir so they keep firing the output.
+        for (let j = remap.length - 1; j >= 0; j--) {
+          const r = remap[j];
+          if (r.physicalButton === heir && r.activates === btnId) {
+            remap.splice(j, 1);
+          } else if (r.activates === btnId) {
+            r.activates = heir;
+          }
+        }
+      } else {
+        arr[i] = 'BTN_UNSPECIFIED';
       }
     }
-  }
-  if (Array.isArray(cc.stickDirectionMappings)) {
-    for (let i = 0; i < cc.stickDirectionMappings.length; i++) {
-      if (cc.stickDirectionMappings[i] === btnId) {
-        cc.stickDirectionMappings[i] = 'BTN_UNSPECIFIED';
-      }
-    }
+  };
+  clearAndPromote(cc.digitalButtonMappings);
+  clearAndPromote(cc.stickDirectionMappings);
+
+  // Drop any buttonRemapping entry FROM btnId (either explicit-disable or a
+  // now-stale additional-bind entry). Do this after the promotion step so we
+  // don't remove an entry we might want to promote.
+  if (Array.isArray(profile.buttonRemapping)) {
+    profile.buttonRemapping = profile.buttonRemapping.filter(r => r.physicalButton !== btnId);
   }
   // Modifier groups: drop btnId from any entry's buttons array. If a group
   // ends up with no buttons we LEAVE the entries in place (buttons=[] is
@@ -4169,12 +4322,13 @@ function wireSettingsHandlers() {
     p.modeId = newMode;
     // Entering CUSTOM: preserveOutputsAcrossModeChange has already written
     // this profile's effective binds into customModeConfig via
-    // translateControllerToCustom. Now clear buttonRemapping — CUSTOM goes
-    // through the same HandleRemap (inherits from ControllerMode), so leftover
-    // explicit-disables from the source mode would silently turn off buttons
-    // the user expects to be able to bind under CUSTOM.
+    // translateControllerToCustom, including additional-binding remaps for
+    // outputs that were bound to multiple physical buttons in the source
+    // mode. Run sanitize afterwards so any explicit-disable entries from the
+    // source mode are dropped (they'd silently kill buttons the user then
+    // binds under CUSTOM) while valid additional-binding entries stay.
     if (newMode === 'MODE_CUSTOM' && oldMode !== 'MODE_CUSTOM') {
-      p.buttonRemapping = [];
+      sanitizeCustomButtonRemapping(p);
     }
     // Leaving CUSTOM: translateCustomToController has already written the
     // buttonRemapping entries needed to preserve the CUSTOM binds. Only extra
@@ -4564,6 +4718,9 @@ function clearAllBindings(profile) {
       cc.modifiers               = [];
       cc.analogTriggerMappings   = [];
     }
+    // Also drop any additional-binding remaps — with no primaries left they'd
+    // be dead-letters, and Clear binds is meant to leave a truly blank slate.
+    profile.buttonRemapping = [];
   } else {
     // Controller mode: explicit disable every remappable non-MB button.
     profile.buttonRemapping = BUTTON_LAYOUT
