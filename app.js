@@ -42,11 +42,7 @@ message Config { repeated GameModeConfig game_mode_configs=1; repeated Communica
 message DeviceInfo { string firmware_name=1; string firmware_version=2; string device_name=3; }
 `;
 
-// ---------------------------------------------------------------------------
-// Constants: Button layout (positions from the reference layout SVG,
-// viewBox 0 0 912 491). Buttons are r=29.3 except LT6 (large, r=34.5) and
-// the menu cluster MB1-7 (r=8.5). Menu buttons sit in the top-left corner.
-// ---------------------------------------------------------------------------
+// Button positions in viewBox 0 0 912 491. r=29.3 except LT6 (r=34.5) and MB1-7 (r=8.5).
 const BUTTON_LAYOUT = [
   // Left finger cluster
   { id: 'BTN_LF4', x:  55.35, y: 171.26, r: 29.30, label: 'LF4' },
@@ -142,18 +138,9 @@ const OUTPUT_OPTION_LABELS = {
   OUT_L:'L', OUT_R:'R', OUT_Z:'Z', OUT_ZL:'ZL', OUT_ZR:'ZR',
 };
 
-// ---------------------------------------------------------------------------
-// Mode → button → output mapping (derived from firmware src/modes/*)
-// Outputs use platform-agnostic IDs that are later styled per platform.
-//   Face buttons: a, b, x, y
-//   Bumpers/triggers: lb, rb, lt, rt
-//   Stick clicks: ls, rs
-//   D-pad: dup, ddown, dleft, dright
-//   Left stick directions: lsl, lsr, lsu, lsd
-//   C-stick / Right stick directions: csl, csr, csu, csd
-//   System: start, select, home, capture
-//   Platform-fighter modifiers: mx, my
-// ---------------------------------------------------------------------------
+// Mode → button → output mapping (from firmware src/modes/*). Output IDs are
+// platform-agnostic (a/b/x/y, lb/rb/lt/rt, ls/rs, dup/ddown/..., lsl/lsr/...,
+// csl/csr/..., start/select/home/capture, mx/my modifiers) and styled per platform.
 const FGC_MAP = {
   // D-pad (firmware: LF1/2/3=dpad right/down/left, LT1=dpad up)
   BTN_LF1: 'dright', BTN_LF2: 'ddown', BTN_LF3: 'dleft', BTN_LT1: 'dup',
@@ -203,10 +190,7 @@ const PROJECT_M_MAP = {
   ...PLATFORM_FIGHTER_MAP,
 };
 
-// Rivals of Aether: Melee-style D-pad (LT6/LF7/LF8/LF6) and RF7/RF8 are stick
-// clicks — NOT the PFM dpad. RF9 fires LB.
-// Source: src/modes/RivalsOfAether.cpp:29-30 (rf7=ls, rf8=rs),
-//         lines 44-47 (lt6/lf7/lf8/lf6 dpad), line 62 (rf9=buttonL).
+// RoA: Melee-style D-pad, RF7/RF8 are stick clicks (not dpad like PFM), RF9 = LB.
 const ROA_MAP = {
   // Face buttons (same as PFM)
   BTN_RT1: 'a', BTN_RF1: 'b', BTN_RF2: 'x', BTN_RF6: 'y',
@@ -226,9 +210,7 @@ const ROA_MAP = {
   BTN_RF9: 'lb',
 };
 
-// Rivals 2: same D-pad / stick-click layout as RoA, but LT5 fires LB.
-// Source: src/modes/Rivals2.cpp:28 (lt5=buttonL),
-//         lines 56-59 (lt6/lf7/lf8/lf6 dpad), lines 74-75 (rf7=ls, rf8=rs).
+// RoA2: same as RoA but LT5 = LB (not RF9).
 const ROA2_MAP = {
   // Face buttons
   BTN_RT1: 'a', BTN_RF1: 'b', BTN_RF2: 'x', BTN_RF6: 'y',
@@ -272,31 +254,14 @@ const MODE_OUTPUT_MAP = {
   // keyboard / custom – left undefined; falls back to blank
 };
 
-// When the user changes a profile's modeId we want EVERY button's effective
-// output to stay the same, including ones whose outputs come from the old
-// mode's native defaults rather than from an explicit remap entry. We do this
-// by walking every physical button, resolving its current output under the
-// old mode, then writing a remap entry in the new mode that re-points the
-// button at whichever new-mode slot natively produces that same output.
-//
-// Rules:
-//   * Explicit disables (no `activates`)         → left alone
-//   * MB buttons (menuButtonIcon-driven)         → left alone
-//   * If the new mode natively produces the same output on the same physical
-//     button, any pre-existing remap entry for that button is REMOVED (keeps
-//     the data clean — no redundant entries)
-//   * If the output simply doesn't exist in the new mode (e.g. `mx`/`my` going
-//     into FGC), any pre-existing remap entry is left alone so the button
-//     still does what it always did on that target (or becomes the new mode's
-//     default for that slot if there's no remap).
+// Preserve each button's effective output across a mode change by rewriting
+// its remap to whichever new-mode button natively produces the same output.
+// Explicit disables and MB buttons untouched; outputs missing from new mode
+// (e.g. mx/my → FGC) become explicit disables.
 function preserveOutputsAcrossModeChange(profile, oldMode, newMode) {
-  // Keyboard mode bypasses buttonRemapping entirely (CustomKeyboardMode.cpp),
-  // so there's nothing meaningful to convert across a keyboard transition.
+  // Keyboard uses buttonsToKeycodes, not buttonRemapping — nothing to translate.
   if (oldMode === 'MODE_KEYBOARD' || newMode === 'MODE_KEYBOARD') return;
-  // CUSTOM ↔ controller transitions are translated separately: the CUSTOM
-  // binding format lives in customModeConfig.digital/stickDirectionMappings
-  // and MODE_OUTPUT_MAP has no entry for CUSTOM. Fall through to the shared
-  // controller-to-controller path only when both ends are non-CUSTOM.
+  // CUSTOM ↔ controller: dispatch to the dedicated translators (CUSTOM has no MODE_OUTPUT_MAP).
   if (oldMode !== 'MODE_CUSTOM' && newMode === 'MODE_CUSTOM') {
     translateControllerToCustom(profile, oldMode);
     return;
@@ -314,17 +279,13 @@ function preserveOutputsAcrossModeChange(profile, oldMode, newMode) {
 
   if (!Array.isArray(profile.buttonRemapping)) profile.buttonRemapping = [];
 
-  // Snapshot the *effective* output of every non-menu button under the OLD mode.
+  // Snapshot effective outputs under oldMode; skip explicit disables.
   const rmap = remapMap(profile);
-  const oldEffective = {};  // physBtnId → outputId
+  const oldEffective = {};
   for (const btn of BUTTON_LAYOUT) {
     if (btn.id.startsWith('BTN_MB')) continue;
-    // Don't touch explicit disables — the user disabled the button on purpose,
-    // regardless of mode.
     const existing = profile.buttonRemapping.find(r => r.physicalButton === btn.id);
-    if (existing && (!existing.activates || existing.activates === 'BTN_UNSPECIFIED')) {
-      continue;
-    }
+    if (existing && (!existing.activates || existing.activates === 'BTN_UNSPECIFIED')) continue;
     const logical = resolveLogicalButton(btn.id, rmap);
     if (!logical) continue;
     const out = oldModeMap[logical];
@@ -344,10 +305,7 @@ function preserveOutputsAcrossModeChange(profile, oldMode, newMode) {
     const idx = profile.buttonRemapping.findIndex(r => r.physicalButton === physBtn);
 
     if (newTarget == null) {
-      // The desired output doesn't exist in the new mode (e.g. mx/my going
-      // into FGC). Disable the button explicitly instead of letting the new
-      // mode's native default take over — the user wants the bind to simply
-      // disappear, and they can re-add it manually if they switch back.
+      // Output missing from new mode → explicit-disable so mode default doesn't take over.
       const disableEntry = { physicalButton: physBtn };
       if (idx >= 0) profile.buttonRemapping[idx] = disableEntry;
       else          profile.buttonRemapping.push(disableEntry);
@@ -355,8 +313,7 @@ function preserveOutputsAcrossModeChange(profile, oldMode, newMode) {
     }
 
     if (newModeMap[physBtn] === desiredOutput) {
-      // The new mode's native default for this physical button already matches —
-      // drop any remap entry so the data stays clean.
+      // Native default already matches — drop any redundant remap.
       if (idx >= 0) profile.buttonRemapping.splice(idx, 1);
       continue;
     }
@@ -367,20 +324,15 @@ function preserveOutputsAcrossModeChange(profile, oldMode, newMode) {
   }
 }
 
-// Controller mode → CUSTOM: walk every physical button's effective output
-// under the source controller mode and write it into the target profile's
-// CustomModeConfig (digitalButtonMappings / stickDirectionMappings). Outputs
-// the source mode surfaces that CUSTOM can't express (mx, my, rt_light,
-// rt_mid) are dropped — CUSTOM has no representation for them.
+// Controller → CUSTOM: write each button's effective output into digital/
+// stickDirectionMappings. Mode-specific outputs CUSTOM can't express (mx, my,
+// rt_light, rt_mid) are dropped.
 function translateControllerToCustom(profile, oldMode) {
   const oldModeMap = MODE_OUTPUT_MAP[oldMode] || {};
   const cc = ensureCustomConfig(profile);
-  // Reset to blanks so a stale binding from a previous CUSTOM stint doesn't
-  // leak through. Keep other custom-mode data (stick range, modifiers,
-  // triggers, combo mappings) — those are user preferences unrelated to binds.
+  // Reset only the binding arrays; keep stick range / modifiers / triggers.
   cc.digitalButtonMappings  = [];
   cc.stickDirectionMappings = [];
-  // Additional-bind entries produced along the way; installed after primaries.
   const additionalRemaps = [];
 
   const setDigital = (idx, btn) => {
@@ -409,8 +361,7 @@ function translateControllerToCustom(profile, oldMode) {
       if (!existingPrimary || existingPrimary === 'BTN_UNSPECIFIED') {
         setDigital(digIdx, btn.id);
       } else if (existingPrimary !== btn.id) {
-        // Source mode had multiple buttons producing this output — preserve
-        // the many-to-one binding as an additional-bind remap.
+        // Many-to-one: preserve as an additional-bind remap.
         additionalRemaps.push({ physicalButton: btn.id, activates: existingPrimary });
       }
       continue;
@@ -423,13 +374,10 @@ function translateControllerToCustom(profile, oldMode) {
       } else if (existingPrimary !== btn.id) {
         additionalRemaps.push({ physicalButton: btn.id, activates: existingPrimary });
       }
-      continue;
     }
-    // Other outputs (mx / my / rt_light / rt_mid) have no CUSTOM slot — drop.
   }
 
-  // Merge additional-bind entries into buttonRemapping. Drop any prior entry
-  // for the same physicalButton to avoid duplicates from previous stints.
+  // Merge additional-bind entries in, replacing any prior entry for the same phys.
   const existing = Array.isArray(profile.buttonRemapping) ? profile.buttonRemapping : [];
   const additionalPhys = new Set(additionalRemaps.map(r => r.physicalButton));
   profile.buttonRemapping = existing
@@ -437,22 +385,17 @@ function translateControllerToCustom(profile, oldMode) {
     .concat(additionalRemaps);
 }
 
-// CUSTOM → controller: translate the profile's CustomModeConfig (digital-
-// ButtonMappings / stickDirectionMappings) into buttonRemapping entries that
-// produce the same physical-button → output association under the new
-// controller mode's map. Buttons that would produce output under the new
-// mode's defaults but are NOT bound in CUSTOM get explicit-disable entries so
-// no phantom output leaks in from the mode-map defaults.
+// CUSTOM → controller: produce buttonRemapping entries so each CUSTOM binding
+// hits the same output in the new mode. Non-menu buttons unbound in CUSTOM
+// get explicit disables so mode-map defaults don't leak in.
 function translateCustomToController(profile, newMode) {
   const newModeMap = MODE_OUTPUT_MAP[newMode] || {};
   const cc = getCustomConfig(profile);
   const digital = cc?.digitalButtonMappings  || [];
   const stick   = cc?.stickDirectionMappings || [];
 
-  // Look up each CUSTOM primary's output so we can honour CUSTOM's additional-
-  // binding entries: `{X, activates: Y}` in CUSTOM means "X fires whatever Y
-  // fires". We need to know what Y fires to write X's entry in the new mode.
-  const primaryOutput = {};   // physBtn → outputId
+  // physBtn → outputId for each CUSTOM primary, used to resolve additional-bind entries.
+  const primaryOutput = {};
   for (let i = 0; i < digital.length; i++) {
     const out = DIGITAL_OUTPUT_TO_OUTPUT_ID[i];
     const b = digital[i];
@@ -464,26 +407,20 @@ function translateCustomToController(profile, newMode) {
     if (out && b && b !== 'BTN_UNSPECIFIED' && !(b in primaryOutput)) primaryOutput[b] = out;
   }
 
-  // Reverse index the new mode map: outputId → first physical button that
-  // natively produces it. First-wins keeps the data clean (no redundant remaps).
+  // Reverse index newModeMap; first-wins keeps output data clean.
   const outputToPhys = {};
   for (const [phys, out] of Object.entries(newModeMap)) {
     if (!(out in outputToPhys)) outputToPhys[out] = phys;
   }
 
   const remap = [];
-  const bound = new Set();  // physical buttons the user bound in CUSTOM
+  const bound = new Set();
   const addBind = (physBtn, output) => {
     if (!physBtn || physBtn === 'BTN_UNSPECIFIED') return;
     bound.add(physBtn);
     const target = outputToPhys[output];
-    if (!target) {
-      // Output doesn't exist in the new mode. Explicit-disable so the physical
-      // button doesn't accidentally activate the new mode's native default.
-      remap.push({ physicalButton: physBtn });
-      return;
-    }
-    if (newModeMap[physBtn] === output) return;   // native default matches — no entry
+    if (!target) { remap.push({ physicalButton: physBtn }); return; }   // output missing in new mode → disable
+    if (newModeMap[physBtn] === output) return;
     remap.push({ physicalButton: physBtn, activates: target });
   };
 
@@ -496,21 +433,15 @@ function translateCustomToController(profile, newMode) {
     if (out) addBind(stick[i], out);
   }
 
-  // CUSTOM's additional-binding entries: `{X, activates: Y}` where Y is a
-  // primary. Resolve Y's output through primaryOutput and add X as another
-  // button firing the same output in the new mode. Skip entries whose target
-  // isn't a valid CUSTOM primary (dead-letter — sanitize will normally drop
-  // these but be robust).
+  // CUSTOM additional-binds: resolve `{X, activates: Y}` through primaryOutput.
   for (const r of (profile.buttonRemapping || [])) {
-    if (!r.activates || r.activates === 'BTN_UNSPECIFIED') continue;   // explicit-disable, drop
+    if (!r.activates || r.activates === 'BTN_UNSPECIFIED') continue;
     const out = primaryOutput[r.activates];
     if (!out) continue;
     addBind(r.physicalButton, out);
   }
 
-  // CUSTOM's "unmapped = no output" is stricter than controller-mode defaults.
-  // Every non-menu button in the new mode's map that isn't bound in CUSTOM
-  // gets explicit-disabled so its native mode default doesn't leak through.
+  // Explicit-disable everything not bound in CUSTOM (stricter "unmapped = no output" semantics).
   for (const phys of Object.keys(newModeMap)) {
     if (phys.startsWith('BTN_MB')) continue;
     if (bound.has(phys)) continue;
@@ -521,17 +452,9 @@ function translateCustomToController(profile, newMode) {
   profile.buttonRemapping = remap;
 }
 
-// Menu buttons (MB4-MB7) get their outputs hardcoded by the firmware regardless
-// of the profile's `menuButtonIcon` field — `menuButtonIcon` is purely a display
-// hint. Sources (Ultimate.cpp, Rivals*.cpp, ProjectM.cpp, Melee20Button.cpp,
-// FgcMode.cpp, 64.cpp):
-//   outputs.start   = inputs.mb7;
-//   outputs.select  = inputs.mb6;
-//   outputs.home    = inputs.mb5;
-//   outputs.capture = inputs.mb4;
-// So fall back to these defaults when the profile leaves menuButtonIcon as
-// OUT_UNSPECIFIED — most notably the official defaults leave MB4 unspec but
-// the device still emits Capture.
+// Firmware hardcodes MB4=capture, MB5=home, MB6=select, MB7=start in every
+// controller mode; menuButtonIcon is a display hint. Used when the profile
+// leaves menuButtonIcon as OUT_UNSPECIFIED.
 const MENU_BUTTON_FIRMWARE_DEFAULTS = {
   BTN_MB4: 'capture',
   BTN_MB5: 'home',
@@ -539,9 +462,7 @@ const MENU_BUTTON_FIRMWARE_DEFAULTS = {
   BTN_MB7: 'start',
 };
 
-// Map proto OutputOption enum values (used in profile.menuButtonIcon) to our
-// platform-agnostic output ids. Allows menu buttons to display the icon the
-// user configured rather than the firmware default.
+// Proto OutputOption enum → internal output id (for menuButtonIcon display).
 const OUTPUT_OPTION_TO_OUTPUT_ID = {
   OUT_A: 'a', OUT_B: 'b', OUT_X: 'x', OUT_Y: 'y',
   OUT_LB: 'lb', OUT_RB: 'rb', OUT_LT: 'lt', OUT_RT: 'rt',
@@ -560,10 +481,8 @@ const OUTPUT_OPTION_TO_OUTPUT_ID = {
   OUT_L: 'lb', OUT_R: 'rb', OUT_Z: 'rb', OUT_ZL: 'lt', OUT_ZR: 'rt',
 };
 
-// DigitalOutput proto enum index (1-based) → internal output id.
-// Used by CustomControllerMode: digitalButtonMappings[i] holds the physical
-// button that activates DigitalOutput value (i+1). Indices in this array
-// correspond to (proto enum value - 1).
+// digitalButtonMappings[i] slot maps to DigitalOutput (i+1); this array
+// gives the internal output id for each slot.
 const DIGITAL_OUTPUT_TO_OUTPUT_ID = [
   'a',       // GP_A = 1
   'b',       // GP_B = 2
@@ -585,10 +504,7 @@ const DIGITAL_OUTPUT_TO_OUTPUT_ID = [
   'rs',      // GP_RSTICK_CLICK = 18
 ];
 
-// StickDirectionButton proto enum index (1-based) → internal output id.
-// stickDirectionMappings[i] = the physical button that activates
-// StickDirectionButton value (i+1). Right stick maps to 'cs*' (c-stick) to
-// match the existing naming convention.
+// stickDirectionMappings[i] slot maps to StickDirectionButton (i+1). Right stick uses 'cs*' naming.
 const STICK_DIR_TO_OUTPUT_ID = [
   'lsu',     // SD_LSTICK_UP = 1
   'lsd',     // SD_LSTICK_DOWN = 2
@@ -600,26 +516,20 @@ const STICK_DIR_TO_OUTPUT_ID = [
   'csr',     // SD_RSTICK_RIGHT = 8
 ];
 
-// Reverse lookups for CUSTOM mode writes: given an output id, where do we
-// store the physical-button binding in the CustomModeConfig?
+// output id → slot index in the corresponding CUSTOM array (reverse of above).
 const OUTPUT_ID_TO_DIGITAL_INDEX = {};
 const OUTPUT_ID_TO_STICK_INDEX = {};
 DIGITAL_OUTPUT_TO_OUTPUT_ID.forEach((id, i) => { OUTPUT_ID_TO_DIGITAL_INDEX[id] = i; });
 STICK_DIR_TO_OUTPUT_ID.forEach((id, i) => { OUTPUT_ID_TO_STICK_INDEX[id] = i; });
 
-// Set of output ids that CUSTOM mode firmware can drive. Everything else
-// ('mx', 'my', 'rt_light', 'rt_mid') is mode-specific and has no place in the
-// generic CustomControllerMode.
+// Output ids CUSTOM firmware can drive. Excludes mx/my/rt_light/rt_mid (mode-specific).
 const CUSTOM_MODE_OUTPUTS = new Set([
   ...DIGITAL_OUTPUT_TO_OUTPUT_ID,
   ...STICK_DIR_TO_OUTPUT_ID,
 ]);
 
-// AnalogAxis proto enum values. Triggers are excluded from the modifier UI
-// because the firmware's digital-trigger force-override (triggerLDigital → 255
-// at the end of UpdateAnalogOutputs) clobbers anything a modifier sets on the
-// trigger axes; for partial-press values use AnalogTriggerMapping (T-entries)
-// instead.
+// Trigger axes excluded: firmware's `triggerLDigital → 255` override at end of
+// UpdateAnalogOutputs clobbers modifier writes. Use AnalogTriggerMapping instead.
 const ANALOG_AXES = [
   { value: 'AXIS_LSTICK_X',  label: 'L-Stick X' },
   { value: 'AXIS_LSTICK_Y',  label: 'L-Stick Y' },
@@ -627,30 +537,22 @@ const ANALOG_AXES = [
   { value: 'AXIS_RSTICK_Y',  label: 'R-Stick Y' },
 ];
 
-// Multiplier that produces no change under both COMBINATION_MODE_OVERRIDE and
-// COMBINATION_MODE_COMPOUND. The user starts with this and edits down/up.
+// No-op multiplier under both OVERRIDE and COMPOUND combination modes.
 const MODIFIER_DEFAULT_MULTIPLIER = 0;
-// Trigger value that represents a full digital press, matching what
-// triggerLDigital → triggerLAnalog produces. Used as the default for new
-// AnalogTriggerMapping entries.
+// Full digital press value (matches triggerLDigital → triggerLAnalog).
 const TRIGGER_FULL_PRESS_VALUE = 255;
 
-// ModifierCombinationMode proto enum values.
 const MOD_COMBINATION_MODES = [
   { value: 'COMBINATION_MODE_OVERRIDE', label: 'Override' },
   { value: 'COMBINATION_MODE_COMPOUND', label: 'Compound' },
 ];
 
-// AnalogTrigger proto enum values for trigger mapping rows.
 const ANALOG_TRIGGERS = [
   { value: 'TRIGGER_LT', label: 'LT (Left)' },
   { value: 'TRIGGER_RT', label: 'RT (Right)' },
 ];
 
-// Virtual outputs that only exist in CUSTOM mode. M{n} = analog modifier
-// group, T{n} = analog trigger mapping. These appear in the popup grid so
-// the user can bind a physical button to a modifier or trigger the same way
-// they'd bind it to a digital output.
+// CUSTOM-only virtual outputs: M{n} = modifier group, T{n} = trigger mapping.
 const MODIFIER_OUTPUT_PREFIX = 'mod:';
 const TRIGGER_OUTPUT_PREFIX  = 'trig:';
 function modifierOutputId(groupIdx) { return MODIFIER_OUTPUT_PREFIX + groupIdx; }
@@ -659,9 +561,7 @@ function isModifierOutputId(id) { return typeof id === 'string' && id.startsWith
 function isTriggerOutputId(id)  { return typeof id === 'string' && id.startsWith(TRIGGER_OUTPUT_PREFIX);  }
 function parseGroupIdx(outputId) { return parseInt(outputId.slice(outputId.indexOf(':') + 1), 10); }
 
-// Stable, deterministic key for an AnalogModifier's `buttons` array.
-// Used to group modifier entries that share the same activation condition
-// into a single M-group in the UI.
+// Group key for AnalogModifier.buttons — used to fold multi-axis entries with the same activation into one M-group.
 function modifierGroupKey(buttons) {
   if (!Array.isArray(buttons) || buttons.length === 0) return '';
   return [...buttons].sort().join('|');
@@ -693,22 +593,16 @@ function modifierGroups(cc) {
 }
 
 // ---------------------------------------------------------------------------
-// Platform display styles
-// Each output id resolves to a visual: { label?, glyph?, bg, fg, kind }
-// kind: 'face' | 'shoulder' | 'system' | 'dpad' | 'stick' | 'cstick' | 'mod'
-// glyph: 'cross' | 'circle' | 'square' | 'triangle' (PS face-button shapes)
+// Platform display styles. Each output id → { label?, glyph?, bg, fg, kind }.
+// kind: face | shoulder | system | dpad | stick | cstick | mod
+// glyph: cross | circle | square | triangle (PS face shapes)
 // ---------------------------------------------------------------------------
-const DARK_BG = '#404040';        // controller-button base when mapped
-const POPUP_NEUTRAL_BG = '#2F2F2F'; // popup glyph base (lighter than popup card)
+const DARK_BG = '#404040';
+const POPUP_NEUTRAL_BG = '#2F2F2F';
 const LIGHT_TEXT = '#f5f5f5';
 
 function mkFace(label, bg, fg = '#fff') { return { label, bg, fg, kind: 'face' }; }
-// PS face buttons render as SVG glyph shapes (cross / circle / square /
-// triangle), so the `label` field is only used for text contexts —
-// tooltips, the remap-list dropdown, outputDropdownLabel. Without it those
-// contexts would fall through to the raw output id ('a', 'b', …) and show
-// lowercase text. Pass the same uppercase letter the Xbox / Switch styles
-// use for consistency.
+// PS renders faces as SVG shapes; `label` is kept for text contexts (tooltips, dropdowns).
 function mkFaceGlyph(glyph, color, label) { return { label, glyph, bg: DARK_BG, fg: color, kind: 'face' }; }
 function mkShoulder(label) { return { label, bg: DARK_BG, fg: LIGHT_TEXT, kind: 'shoulder' }; }
 function mkSystem(label) { return { label, bg: DARK_BG, fg: LIGHT_TEXT, kind: 'system' }; }
@@ -736,9 +630,7 @@ const XBOX_STYLE = {
   rt_light: mkShoulder('Lt'), rt_mid: mkShoulder('Md'),
 };
 
-// PlayStation: face buttons get position-mapped to PS symbols.
-// Xbox A (bottom) → Cross, B (right) → Circle, X (left) → Square, Y (top) → Triangle.
-// Each glyph renders as an outlined SVG shape in its canonical color on a dark bg.
+// PS: face buttons position-mapped (A=cross, B=circle, X=square, Y=triangle).
 const PS_STYLE = {
   a: mkFaceGlyph('cross',    '#7DB3E9', 'A'),   // Cross (blue)
   b: mkFaceGlyph('circle',   '#FF6666', 'B'),   // Circle (red)
@@ -758,12 +650,7 @@ const PS_STYLE = {
   rt_light: mkShoulder('Lt'), rt_mid: mkShoulder('Md'),
 };
 
-// Switch: labels match the firmware's actual behavior (1:1 from OutputState
-// to the Switch HID report — see NintendoSwitchBackend::SendReport). The
-// firmware does NOT swap A↔B / X↔Y between backends; whatever fires
-// outputs.a becomes Switch A regardless of which backend is active. The
-// Switch tab previously showed swapped labels assuming a flip the firmware
-// doesn't perform, which made the labels lie. Honest labels now.
+// Switch: labels are 1:1 with OutputState (firmware doesn't swap A↔B/X↔Y per backend).
 const SWITCH_STYLE = {
   a: mkFace('A', DARK_BG, LIGHT_TEXT),
   b: mkFace('B', DARK_BG, LIGHT_TEXT),
@@ -838,10 +725,7 @@ const PLATFORM_STYLES = {
   n64: N64_STYLE,
 };
 
-// ---------------------------------------------------------------------------
-// Platform icon assets — SVGs baked in as base64 data URIs.
-// Generated from kenney_input-prompts; no external file serving required.
-// ---------------------------------------------------------------------------
+// Platform icon SVGs (base64) from kenney_input-prompts, baked in.
 const _SVG = {
   gc__gamecube_button_color_a: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiPgogIDxkZWZzLz4KICA8Zz4KICAgIDxwYXRoIHN0cm9rZT0ibm9uZSIgZmlsbD0iIzEyREU3RSIgZD0iTTU2IDMyIFE1NiA0MiA0OC45NSA0OC45NSA0MiA1NiAzMiA1NiAyMi4wNSA1NiAxNSA0OC45NSA4IDQyIDggMzIgOCAyMi4wNSAxNSAxNSAyMi4wNSA4IDMyIDggNDIgOCA0OC45NSAxNSA1NiAyMi4wNSA1NiAzMiBNMzggNDIgTDQyIDQyIDM0IDIyIDMwIDIyIDIyIDQyIDI2IDQyIDI3LjYgMzggMzYuNCAzOCAzOCA0MiBNMzIgMjcgTDM0LjggMzQgMjkuMiAzNCAzMiAyNyIvPgogIDwvZz4KPC9zdmc+',
   gc__gamecube_button_color_b: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiPgogIDxkZWZzLz4KICA8Zz4KICAgIDxwYXRoIHN0cm9rZT0ibm9uZSIgZmlsbD0iI0U3MzI0NiIgZD0iTTU2IDMyIFE1NiA0MiA0OC45NSA0OC45NSA0MiA1NiAzMiA1NiAyMi4wNSA1NiAxNSA0OC45NSA4IDQyIDggMzIgOCAyMi4wNSAxNSAxNSAyMi4wNSA4IDMyIDggNDIgOCA0OC45NSAxNSA1NiAyMi4wNSA1NiAzMiBNMzcgMjggUTM3IDI4Ljg1IDM2LjQ1IDI5LjQgTDM2LjQgMjkuNCBRMzUuOCAzMCAzNSAzMCBMMjkgMzAgMjkgMjYgMzUgMjYgUTM1LjggMjYgMzYuMzUgMjYuNTUgTDM2LjQ1IDI2LjY1IFEzNyAyNy4yIDM3IDI4IE00MSAzNiBRNDEgMzMuNyAzOS41IDMyIDQxIDMwLjMgNDEgMjggNDEgMjUuNTUgMzkuMjUgMjMuOCBMMzkuMiAyMy43NSBRMzcuNDUgMjIgMzUgMjIgTDI1IDIyIDI1IDQyIDM1IDQyIFEzNy40NSA0MiAzOS4yIDQwLjI1IEwzOS4yNSA0MC4yIFE0MSAzOC40NSA0MSAzNiBNMzcgMzYgUTM3IDM2LjggMzYuNDUgMzcuMzUgTDM2LjM1IDM3LjQ1IFEzNS44IDM4IDM1IDM4IEwyOSAzOCAyOSAzNCAzNSAzNCBRMzUuOCAzNCAzNi40IDM0LjYgTDM2LjQ1IDM0LjYgUTM3IDM1LjE1IDM3IDM2Ii8+CiAgPC9nPgo8L3N2Zz4=',
@@ -1292,6 +1176,7 @@ async function loadConfigFromDevice() {
     }
     if (pkt[0] !== CMD.SET_CONFIG) { setStatus('Unexpected response: ' + pkt[0], 'error'); return; }
     config = binaryToConfig(pkt.slice(1));
+    normalizeSharedIndices(config);
     selectedProfileIdx = config.gameModeConfigs?.length ? 0 : -1;
     renderAll();
     setStatus('Config loaded from device (' + (config.gameModeConfigs?.length || 0) + ' profiles)', 'connected');
@@ -1332,6 +1217,7 @@ async function saveConfigToDevice() {
 function loadDefaultConfig() {
   // Deep clone from the embedded JSON
   config = JSON.parse(DEFAULT_CONFIG_JSON);
+  normalizeSharedIndices(config);
   selectedProfileIdx = 0;
   renderAll();
   setStatus('Loaded default Glyph profiles', 'disconnected');
@@ -1356,6 +1242,7 @@ function importConfig(file) {
   reader.onload = e => {
     try {
       config = JSON.parse(e.target.result);
+      normalizeSharedIndices(config);
       selectedProfileIdx = config.gameModeConfigs?.length ? 0 : -1;
       renderAll();
       setStatus('Config imported from file (' + (config.gameModeConfigs?.length || 0) + ' profiles)', 'disconnected');
@@ -1380,11 +1267,7 @@ function currentProfile() {
 const DEFAULT_LED_COLOR_INT = 0x22D3EE;          // cyan accent
 const DEFAULT_LED_COLOR_HEX = '#22d3ee';
 
-// ---------------------------------------------------------------------------
-// Keyboard mode — USB HID Keyboard/Keypad Usage Page (0x07) scancodes.
-// The firmware reads `KeyboardModeConfig.buttonsToKeycodes` and emits a HID
-// keyboard report; DInput is the only backend wired to deliver it.
-// ---------------------------------------------------------------------------
+// Keyboard mode — USB HID Usage Page 0x07 scancodes. DInput backend only.
 const { EVENT_CODE_TO_HID, HID_TO_LABEL } = (function () {
   const codeToHid = {};
   const hidToLabel = {};
@@ -1495,13 +1378,7 @@ function isKeyboardProfile(profile) {
 }
 
 // ---------------------------------------------------------------------------
-// Custom mode helpers
-// Each profile that selects MODE_CUSTOM has a 1-based index into
-// Config.customModes[] (mirrors the rgbConfig / keyboardModeConfig pattern).
-// The firmware's CustomControllerMode walks digitalButtonMappings (output
-// index = DigitalOutput-1) and stickDirectionMappings (index =
-// StickDirectionButton-1) to figure out which physical button activates each
-// output, plus a list of modifier rules that scale or override stick axes.
+// Custom mode helpers (customModeConfig is a 1-based index into Config.customModes[])
 // ---------------------------------------------------------------------------
 function isCustomProfile(profile) {
   return profile?.modeId === 'MODE_CUSTOM';
@@ -1552,11 +1429,7 @@ function getCustomConfig(profile) {
   return config.customModes[idx] || null;
 }
 
-// Materialise NEUTRAL SocdPair entries for every axis the current profile /
-// mode surfaces (Left X, Left Y, D-Pad X, D-Pad Y, Right X, Right Y). Only
-// axes whose button pair actually resolves in this mode get an entry; the
-// rest are left alone. Called after applying a fresh profile's mode defaults
-// so the axis rows show "Neutral" instead of "None" out of the gate.
+// Add NEUTRAL entries for every axis the mode surfaces so rows default to Neutral, not None.
 function seedNeutralSocdPairs(profile) {
   if (!Array.isArray(profile.socdPairs)) profile.socdPairs = [];
   for (const axis of SOCD_AXES) {
@@ -1573,8 +1446,7 @@ function seedNeutralSocdPairs(profile) {
   }
 }
 
-// MB1 is the hardware "open device menu" button — never remappable, but it has
-// an addressable LED so its color can still be customized.
+// MB1 opens the device menu — never remappable, but has an addressable LED.
 const NON_REMAPPABLE_BUTTONS = new Set(['BTN_MB1']);
 
 // MB2-MB7 are mapped to gamepad outputs but have NO physical LED on the device,
@@ -1654,9 +1526,7 @@ function hsvToRgbInt(h, s, v) {
 }
 
 // ---------------------------------------------------------------------------
-// Saved-colors palette
-// User-managed list of quick-pick LED colors, persisted to localStorage.
-// Used by both the assign popup and the right-panel Button Lighting section.
+// Saved-colors palette — user's quick-pick LED colors, persisted to localStorage.
 // ---------------------------------------------------------------------------
 const SAVED_COLORS_KEY = 'glyph-remapper:savedColors';
 const SAVED_COLORS_MAX = 24;
@@ -1820,12 +1690,7 @@ function getRgbConfig(profile) {
   return config.rgbConfigs[idx] || null;
 }
 
-// Get the LED color (as uint32) for a physical button on this profile.
-// Returns 0 (off) when there's no entry — matches the firmware, which
-// zeroes _button_colors[] then overwrites only the buttons that have an
-// entry in the proto. The configurator used to fall back to defaultColor
-// here, but that disagreed with the device behavior and made it impossible
-// for the UI to express "this button's LED is intentionally off".
+// LED color for a button, or 0 (off) if no entry — matches firmware behavior.
 function getButtonColor(profile, btnId) {
   const rgb = getRgbConfig(profile);
   if (!rgb) return 0;
@@ -1835,9 +1700,8 @@ function getButtonColor(profile, btnId) {
 }
 
 function setButtonColor(profile, btnId, color) {
-  // MB2-MB7 have no physical LED — refuse any color assignment so they never
-  // make it into config.rgbConfigs[].buttonColors.
-  if (!hasLED(btnId)) return;
+  if (!hasLED(btnId)) return;   // MB2-MB7 have no physical LED
+
   const rgb = ensureRgbConfig(profile);
   if (!rgb.buttonColors) rgb.buttonColors = [];
   const idx = rgb.buttonColors.findIndex(c => c.button === btnId);
@@ -1846,11 +1710,7 @@ function setButtonColor(profile, btnId, color) {
   else rgb.buttonColors.push({ button: btnId, color: value });
 }
 
-// Paint every currently-active LED-capable button on this profile with a
-// specific colour. "Active" = has an output binding (or a keycode in keyboard
-// mode) OR is non-remappable (MB1 has a hardware LED and is always considered
-// on). Shared by the Button Lighting "Apply to active" click, the Button
-// Remapping "Apply preset" flow, and anywhere else that wants to bulk-paint.
+// Paint every active LED-capable button with `colorInt`. Active = bound or MB1.
 function paintActiveButtons(profile, colorInt) {
   const keyboardMode = isKeyboardProfile(profile);
   const rmap = remapMap(profile);
@@ -1887,21 +1747,9 @@ function stripDisabledLeds(cfg) {
   return clone;
 }
 
-// Firmware (ConfiguratorBackend.cpp) rejects any config where:
-//  - a profile's mode_id is not MODE_CUSTOM but custom_mode_config > 0
-//  - a profile's mode_id is not MODE_KEYBOARD but keyboard_mode_config > 0
-//  - a backend's default_mode_config points past gameModeConfigs.length
-// Any of those slips through easily (mode change forgets to clear the
-// pointer, delete-profile doesn't remap backend defaults, imported JSON is
-// stale, etc.). Rather than fix every mutation path, scrub at the encode
-// boundary so no invalid config reaches the device or a JSON export.
-// Drop buttonRemapping entries that don't make sense in CUSTOM mode:
-//   * explicit-disable entries (no `activates`), which would silently kill
-//     buttons the user then binds via digital/stick mappings
-//   * "additional-binding" entries whose `activates` target isn't a primary
-//     in digital/stick mappings, i.e. dead-letters that don't fire anything
-// Called on CUSTOM entry (in place of the older "wipe everything" behaviour)
-// and again at encode time as a defense-in-depth clamp.
+// Drops CUSTOM-invalid buttonRemapping entries: explicit-disables (kill user
+// binds under CUSTOM) and additional-binds whose `activates` isn't a primary
+// (dead-letters). Called on CUSTOM entry and again in sanitizeConfigForEncode.
 function sanitizeCustomButtonRemapping(profile) {
   if (!Array.isArray(profile.buttonRemapping) || profile.buttonRemapping.length === 0) return;
   const cc = getCustomConfig(profile);
@@ -1930,6 +1778,55 @@ function sanitizeConfigForEncode(cfg) {
   return cfg;
 }
 
+// rgbConfig / keyboardModeConfig / customModeConfig are 1-based shared-array
+// indices; when two profiles share an index they mutate each other's data.
+// The two helpers below split sharing at duplicate-time and load-time.
+
+// Clone the shared entries this profile inherited (via duplicate) so it owns them.
+function splitSharedIndices(profile, cfg = config) {
+  if (!profile || !cfg?.gameModeConfigs) return;
+  const others = cfg.gameModeConfigs.filter(p => p !== profile);
+  const trySplit = (fieldName, arrayName) => {
+    const idx1 = profile[fieldName];
+    if (!idx1 || idx1 <= 0) return;
+    if (!others.some(p => p[fieldName] === idx1)) return;
+    const arr = cfg[arrayName];
+    if (!Array.isArray(arr)) return;
+    const src = arr[idx1 - 1];
+    if (!src) return;
+    arr.push(JSON.parse(JSON.stringify(src)));
+    profile[fieldName] = arr.length;
+  };
+  trySplit('rgbConfig',          'rgbConfigs');
+  trySplit('keyboardModeConfig', 'keyboardModes');
+  trySplit('customModeConfig',   'customModes');
+}
+
+// Split any shared indices at load time so legacy configs don't propagate the bug.
+function normalizeSharedIndices(cfg) {
+  if (!cfg?.gameModeConfigs) return cfg;
+  const FIELDS = [
+    ['rgbConfig',          'rgbConfigs'],
+    ['keyboardModeConfig', 'keyboardModes'],
+    ['customModeConfig',   'customModes'],
+  ];
+  for (const [field, arrayName] of FIELDS) {
+    const seen = new Set();
+    for (const p of cfg.gameModeConfigs) {
+      const idx = p[field];
+      if (!idx || idx <= 0) continue;
+      if (!seen.has(idx)) { seen.add(idx); continue; }
+      const arr = cfg[arrayName];
+      const src = arr?.[idx - 1];
+      if (!src) continue;
+      arr.push(JSON.parse(JSON.stringify(src)));
+      p[field] = arr.length;
+      seen.add(arr.length);
+    }
+  }
+  return cfg;
+}
+
 // Live-update the ring stroke for a single button without rebuilding the whole SVG.
 // The .btn-ring stroke reads from --led-color via CSS, so we set the custom
 // property on the group element (inline style — overrides CSS rules). Also
@@ -1953,9 +1850,7 @@ function remapMap(profile) {
   return map;
 }
 
-// Follow the remap chain for a physical button.
-// Returns the final "logical" button id that fires when this physical button is pressed.
-// If the button is remapped to BTN_UNSPECIFIED, returns null (disabled).
+// Follow the remap chain to the logical button that fires. Returns null if disabled.
 function resolveLogicalButton(physBtnId, rmap) {
   if (!(physBtnId in rmap)) return physBtnId;
   const target = rmap[physBtnId];
@@ -1965,28 +1860,13 @@ function resolveLogicalButton(physBtnId, rmap) {
   return target;
 }
 
-// Resolve the platform-agnostic output id for a physical button in the given profile.
-// Returns null if the button has no output (unmapped or explicitly disabled).
-//
-// Notes on the "disabled" mechanism: the official configurator marks unused
-// buttons by adding an entry to buttonRemapping with `physicalButton` set but
-// `activates` missing/BTN_UNSPECIFIED. resolveLogicalButton() handles this by
-// returning null when activates is falsy, so we don't need a separate
-// target-hiding rule — the user/config decides what's disabled per profile.
+// Resolve a physical button's output id for this profile, or null if unmapped/disabled.
 function resolveButtonOutput(physBtnId, profile, rmap) {
   if (!profile) return null;
 
-  // Menu buttons (MB1-MB7):
-  //   1. If menuButtonIcon[i] is set explicitly, use that (the per-profile UI override).
-  //   2. Otherwise fall back to the firmware's hardcoded MB→output mapping
-  //      (MB4=capture, MB5=home, MB6=select, MB7=start) — these are wired in
-  //      every controller mode, so showing the icon here reflects what the
-  //      device actually emits.
+  // MB: prefer explicit menuButtonIcon override; else the firmware's hardcoded default.
   if (physBtnId.startsWith('BTN_MB')) {
-    // Custom mode: menuButtonIcon is purely cosmetic (OLED display) and has no
-    // effect on actual firmware output. MB buttons only produce output when
-    // explicitly assigned in digitalButtonMappings, so skip both the icon and
-    // firmware-defaults paths and check the custom config directly.
+    // In CUSTOM, MB icons are cosmetic — actual output comes from digitalButtonMappings.
     if (isCustomProfile(profile)) return resolveCustomButtonOutput(physBtnId, profile);
 
     const mbIdx = parseInt(physBtnId.slice(6), 10) - 1;
@@ -2002,9 +1882,6 @@ function resolveButtonOutput(physBtnId, profile, rmap) {
   const logical = resolveLogicalButton(physBtnId, rmap);
   if (!logical) return null;
 
-  // CUSTOM mode bypasses MODE_OUTPUT_MAP and reads from the profile's
-  // CustomModeConfig instead. The firmware uses the post-remap (logical)
-  // button to look up outputs, so we honor the same chain.
   if (isCustomProfile(profile)) {
     return resolveCustomButtonOutput(logical, profile);
   }
@@ -2014,13 +1891,7 @@ function resolveButtonOutput(physBtnId, profile, rmap) {
   return modeMap[logical] || null;
 }
 
-// Look up a physical button in the CustomModeConfig arrays. Returns the
-// internal output id ('a', 'lsl', 'mod:0', 'trig:0', …) if the button is
-// bound to any digital output, stick direction, modifier group, or trigger
-// mapping. Resolution priority: digital → stick direction → modifier → trigger.
-// (A button can technically be bound to both a digital output and a modifier
-// at once — both fire in firmware — but the controller-button rendering only
-// shows one label, so digital wins for display.)
+// CUSTOM button → output id. Priority: digital → stick → modifier → trigger.
 function resolveCustomButtonOutput(btnId, profile) {
   const cc = getCustomConfig(profile);
   if (!cc) return null;
@@ -2067,10 +1938,7 @@ function addProfile() {
     return;
   }
   if (!config.gameModeConfigs) config.gameModeConfigs = [];
-  // New profiles start as MODE_CUSTOM with an empty CustomModeConfig — no
-  // button mappings, no stick directions, no modifiers, no triggers. That
-  // gives a truly blank canvas; the user can switch to a specific mode
-  // afterwards if they want that mode's native template.
+  // New profile: blank CUSTOM canvas. User can switch mode for a specific template after.
   const newProfile = {
     modeId: 'MODE_CUSTOM',
     name: 'New Profile',
@@ -2083,10 +1951,7 @@ function addProfile() {
   };
   config.gameModeConfigs.push(newProfile);
   selectedProfileIdx = config.gameModeConfigs.length - 1;
-  // Attach the blank CustomModeConfig — sets customModeConfig index and
-  // pushes an entry onto Config.customModes[] with the standard defaults
-  // (stickRange 100, empty everything).
-  ensureCustomConfig(newProfile);
+  ensureCustomConfig(newProfile);   // attach blank CustomModeConfig
   renderAll();
 }
 
@@ -2094,9 +1959,7 @@ function deleteProfile(idx) {
   if (!config?.gameModeConfigs) return;
   config.gameModeConfigs.splice(idx, 1);
 
-  // Rewrite backend defaultModeConfig (1-based, 0 = unset) so pointers still
-  // reference the same profile after the splice, or clear if they pointed at
-  // the deleted one. Firmware rejects out-of-range pointers on save.
+  // Remap 1-based backend defaultModeConfig pointers; firmware rejects out-of-range.
   for (const bc of (config.communicationBackendConfigs || [])) {
     if (typeof bc.defaultModeConfig !== 'number' || bc.defaultModeConfig === 0) continue;
     if (bc.defaultModeConfig === idx + 1)     bc.defaultModeConfig = 0;
@@ -2109,12 +1972,7 @@ function deleteProfile(idx) {
   renderAll();
 }
 
-// Reorder profiles by moving the entry at `fromIdx` to `toIdx` (0-based).
-// Also rewrites every communicationBackendConfigs[*].defaultModeConfig
-// (1-based, 0 = unset) so those references still point at the same profile
-// after the shift — the Glyph firmware uses this array's order for the
-// on-device profile list, so getting the indices right matters for both
-// saving to the device and for exporting JSON.
+// Reorder profiles (0-based) and remap backend defaultModeConfig pointers.
 function moveProfile(fromIdx, toIdx) {
   if (!config?.gameModeConfigs) return;
   const arr = config.gameModeConfigs;
@@ -2125,20 +1983,16 @@ function moveProfile(fromIdx, toIdx) {
   const [moved] = arr.splice(fromIdx, 1);
   arr.splice(toIdx, 0, moved);
 
-  // Remap backend "default profile" references. defaultModeConfig is 1-based
-  // (0 = unset). See remapProfileIdx1 for the shift math.
   for (const bc of (config.communicationBackendConfigs || [])) {
     if (typeof bc.defaultModeConfig === 'number') {
       bc.defaultModeConfig = remapProfileIdx1(bc.defaultModeConfig, fromIdx, toIdx);
     }
   }
-  // Keep the current selection tracking the same profile.
   selectedProfileIdx = remapProfileIdx0(selectedProfileIdx, fromIdx, toIdx);
   renderAll();
 }
 
-// Given a 1-based index into gameModeConfigs (0 = unset), return the new
-// 1-based index after moving the profile at `from` to `to` (both 0-based).
+// 1-based index into gameModeConfigs after moving from→to (0-based). 0 = unset.
 function remapProfileIdx1(oldIdx1, from, to) {
   if (oldIdx1 === 0) return 0;
   const idx = oldIdx1 - 1;
@@ -2205,26 +2059,22 @@ function buildControllerSVG() {
   for (const btn of BUTTON_LAYOUT) {
     let style = null;
     if (keyboardMode) {
-      // In keyboard mode the button shows whichever HID key it sends.
-      // buttonRemapping is bypassed by the firmware here (per CustomKeyboardMode.cpp).
+      // Keyboard mode shows the HID key; firmware bypasses buttonRemapping.
       const keycode = getButtonKeycode(profile, btn.id);
       if (keycode != null) {
         style = { label: keycodeToLabel(keycode), bg: DARK_BG, fg: LIGHT_TEXT, kind: 'key' };
       }
     } else {
       const outputId = resolveButtonOutput(btn.id, profile, rmap);
-      // Virtual outputs (M:n / T:n) aren't in PLATFORM_STYLES — synthesise a
-      // generic style so they render the same on every platform tab.
+      // Virtual M:n/T:n outputs aren't in PLATFORM_STYLES — synthesise.
       const baseStyle = outputId
         ? (platformStyle[outputId] || virtualOutputStyle(outputId))
         : null;
       style = baseStyle ? { ...baseStyle, _outputId: outputId } : null;
     }
     const isMapped = !!style;
-    // Ring visibility is independent of "mapped" status now — driven purely
-    // by the stored LED color (so users can light up unassigned buttons).
-    //   - MB1: always shown (no off state on the device for this menu button)
-    //   - MB2-MB7: no LED hardware, ring never shown
+    // Ring visibility is driven by stored color, not `mapped`.
+    //   MB1: always shown (no off state); MB2-MB7: no LED, never shown
     //   - everything else: shown iff the stored color is non-zero
     const ledOn = NON_REMAPPABLE_BUTTONS.has(btn.id)
       || (hasLED(btn.id) && getButtonColor(profile, btn.id) !== 0);
@@ -2232,17 +2082,12 @@ function buildControllerSVG() {
     const classes = ['btn-group'];
     if (btn.large) classes.push('btn-large');
     if (btn.menu) classes.push('btn-menu');
-    // `mapped` / `unmapped` controls the icon-fill / hover / selected styling
-    // (still tied to whether there's an output binding). `led-on` is a
-    // separate flag for whether to render the colored ring.
+    // `mapped` toggles icon styling; `led-on` toggles the colored ring separately.
     classes.push(isMapped ? 'mapped' : 'unmapped');
     if (ledOn) classes.push('led-on');
     if (btn.id === selectedBtnId) classes.push('selected');
 
-    // Hover tooltip: "LF2 (L-Down)" for mapped buttons, "LF2" otherwise.
-    // Rendered by a custom #btn-tooltip element via delegated mouse listeners
-    // — see wireToolbarHandlers() — so we can style it consistently with the
-    // rest of the app instead of relying on the native browser tooltip.
+    // Custom #btn-tooltip element; native browser tooltip not used.
     const shortName = btn.id.replace('BTN_', '');
     const tooltipText = style
       ? `${shortName} (${tooltipOutputLabel(style, keyboardMode)})`
@@ -2257,12 +2102,10 @@ function buildControllerSVG() {
       'aria-label': tooltipText,
     });
 
-    // Outer ring (color comes from the --led-color custom property below)
     g.appendChild(svgEl('circle', { cx: btn.x, cy: btn.y, r: btn.r, class: 'btn-ring' }));
     if (ledOn && hasLED(btn.id)) {
       const stored = getButtonColor(profile, btn.id);
-      // Rainbow modes: a button "participates" only if its stored color is
-      // 0xFFFFFF. Indicate this with the shared rainbow-grad stroke.
+      // Rainbow: buttons "participate" iff stored color is 0xFFFFFF; render with rainbow-grad stroke.
       if (rainbowMode && stored >= RAINBOW_PARTICIPATING_COLOR) {
         g.style.setProperty('--led-color', 'url(#rainbow-grad)');
         g.classList.add('btn-rainbow');
@@ -2531,11 +2374,7 @@ function renderProfileList() {
       const dropBefore = item.classList.contains('drop-before');
       item.classList.remove('drop-before', 'drop-after');
       if (Number.isNaN(fromIdx) || fromIdx === i) return;
-      // `i` is the target-item index. Drop-before means insert before it;
-      // drop-after means insert after. If moving down (fromIdx < i), the
-      // splice math means "insert after" is just i and "insert before" is
-      // i - 1. If moving up (fromIdx > i), "insert before" is i and "insert
-      // after" is i + 1.
+      // Splice math: moving down shifts target up by 1; moving up doesn't.
       let toIdx;
       if (fromIdx < i) toIdx = dropBefore ? i - 1 : i;
       else             toIdx = dropBefore ? i     : i + 1;
@@ -2682,6 +2521,11 @@ function duplicateProfile(srcIdx) {
   const existing = new Set(config.gameModeConfigs.map(p => p.name));
   while (existing.has(name)) name = `${baseName} ${n++}`;
   copy.name = name;
+  // JSON.parse copied the rgb/keyboard/custom INDEX verbatim, so the copy
+  // currently shares those entries with the source. Split them off into
+  // fresh slots BEFORE inserting the copy into gameModeConfigs so the
+  // "any other profile has this index" scan sees only the source.
+  splitSharedIndices(copy);
   // Insert directly after the source for a sensible visual position
   config.gameModeConfigs.splice(srcIdx + 1, 0, copy);
   selectedProfileIdx = srcIdx + 1;
@@ -2700,18 +2544,10 @@ function renderSettingsPanel() {
   $('settings-profile-name').textContent = profile.name || 'Profile Settings';
   $('set-name').value = profile.name || '';
 
-  // Keyboard mode hides Backends (the mode-change handler forces DInput-only
-  // for the user) and Button Remapping (firmware bypasses it per
-  // CustomKeyboardMode.cpp).
+  // Keyboard hides Backends (locked to DInput). Advanced remap is hidden for keyboard/custom.
   const keyboardMode = isKeyboardProfile(profile);
   const customMode   = isCustomProfile(profile);
   $('backends-group').style.display = keyboardMode ? 'none' : '';
-  // Button Remapping section: visible for every mode. In keyboard / custom
-  // modes the firmware doesn't actually read profile.buttonRemapping (those
-  // modes carry their own per-button data), but the rows are still
-  // interactive — they edit the keyboard / custom config directly. The
-  // Advanced toggle is hidden in those modes since it only operates on
-  // buttonRemapping; + Add Remap stays visible and seeds a new binding.
   $('remap-group').style.display    = '';
   const advToggle = document.querySelector('#remap-body .remap-mode-switch');
   if (advToggle) advToggle.style.display = (keyboardMode || customMode) ? 'none' : '';
@@ -2817,25 +2653,16 @@ function renderRgbSection(profile) {
   renderAllSavedColorPalettes();
 }
 
-// ---------------------------------------------------------------------------
-// Custom mode section
-// Per-profile UI for editing CustomModeConfig.stickRange and the modifier
-// list. Button mappings are NOT edited here — those are set per-button via
-// the assign popup that opens when clicking a controller button.
-// ---------------------------------------------------------------------------
+// Custom mode section — stickRange + modifier/trigger lists. Button bindings edited via popup.
 function renderCustomModeSection(profile) {
   const cc = ensureCustomConfig(profile);
   if (!cc) return;
-  // Coerce undefined/0 to the Melee default so the input shows something sane.
-  $('set-custom-stick-range').value = String(cc.stickRange || 100);
+  $('set-custom-stick-range').value = String(cc.stickRange || 100);   // Melee default fallback
   renderCustomModifierList(profile, cc);
   renderCustomTriggerList(profile, cc);
 }
 
-// Each row in the modifier list is one M-group — it owns a set of per-axis
-// multipliers that all activate together when the M-group's bound physical
-// button is held. The button assignment is NOT shown here; the user binds it
-// via the popup grid (the M{n} virtual output appears alongside A / B / etc.).
+// One row per M-group. Button binding is set via the popup's M{n} virtual output.
 function renderCustomModifierList(profile, cc) {
   const list = $('custom-modifiers-list');
   list.innerHTML = '';
@@ -2849,10 +2676,7 @@ function buildModifierGroupRow(profile, cc, group, groupIdx) {
   const row = document.createElement('div');
   row.className = 'custom-modifier-row';
 
-  // Header: "M{n}  →  [phys dropdown]". The dropdown is a shortcut for the
-  // popup-grid path — picking a button here calls the same setCustomButton-
-  // Output helper that the M1 glyph would, plus clearing collapses to empty
-  // buttons[] (firmware short-circuits empty mask).
+  // Header: "M{n} → [phys dropdown]". Dropdown calls the same setCustomButtonOutput as the M{n} glyph.
   const head = document.createElement('div');
   head.className = 'custom-group-head';
   const currentBtn = group.buttons[0];   // M-group binds to exactly one phys
@@ -2866,9 +2690,7 @@ function buildModifierGroupRow(profile, cc, group, groupIdx) {
   head.querySelector('select').addEventListener('change', e => {
     const newBtn = e.target.value;
     if (!newBtn) {
-      // Unbound: clear this phys from every entry in the group. The group's
-      // entries stay (so the M-row + axis multipliers persist) but buttons=[]
-      // means the firmware skips them via the mask=0 check.
+      // Unbound: keep entries (M-row persists) but empty buttons[] — firmware skips on mask=0.
       for (const entry of group.entries) entry.buttons = [];
     } else {
       setCustomButtonOutput(profile, newBtn, modifierOutputId(groupIdx));
@@ -2935,11 +2757,7 @@ function buildModifierGroupRow(profile, cc, group, groupIdx) {
   return row;
 }
 
-// Set / clear an axis multiplier on an M-group:
-//  - If there's already a proto entry for this axis in the group, update it
-//    (or delete it if `value` is null).
-//  - Otherwise append a new AnalogModifier entry to cc.modifiers using the
-//    group's existing button-set + combination mode.
+// Set/clear one axis in an M-group. `value === null` deletes the entry.
 function writeModifierAxis(cc, group, axis, value) {
   if (!Array.isArray(cc.modifiers)) cc.modifiers = [];
   const existing = group.entries.find(e => e.axis === axis);
@@ -2966,9 +2784,7 @@ function writeModifierAxis(cc, group, axis, value) {
   group.axes[axis] = value;
 }
 
-// Analog trigger list. Each row is one AnalogTriggerMapping = T{n}. The user
-// edits the trigger (LT/RT) + analog value here, and binds it to a physical
-// button via the popup grid (the T{n} virtual output).
+// One row per T-entry. Button binding is set via the popup's T{n} virtual output.
 function renderCustomTriggerList(profile, cc) {
   const list = $('custom-triggers-list');
   if (!list) return;
@@ -3049,11 +2865,7 @@ function buildAnalogTriggerRow(profile, cc, trigger, idx) {
   return row;
 }
 
-// Fixed stick / d-pad axes for the controller-mode SOCD UI. The D-pad is
-// surfaced as its own pair of axes (separate from the analog stick) so the
-// user can set independent SOCD rules — matching the official configurator.
-// Each axis is only rendered when the current profile actually has buttons
-// producing those outputs (axisButtonPairs filters them out otherwise).
+// SOCD axes rendered when the profile has buttons producing them. D-pad is separate from stick.
 const SOCD_AXES = [
   { id: 'left-x',  label: 'Left X',  outputPairs: [['lsl', 'lsr']] },
   { id: 'left-y',  label: 'Left Y',  outputPairs: [['lsu', 'lsd']] },
@@ -3089,11 +2901,7 @@ function axisButtonPairs(profile, axis) {
     const aBtns = byOut[outA] || [];
     const bBtns = byOut[outB] || [];
     if (!aBtns.length || !bBtns.length) continue;
-    // SOCD is resolved post-remap by firmware (HandleRemap → HandleSocd), so
-    // socdPairs entries reference the *logical* (post-remap) button. Resolve
-    // each canonical physical button through the remap so lookups match what
-    // the firmware sees — e.g. a profile that remaps LF8→LF3 stores its SOCD
-    // entry as LF3+LF1, not LF8+LF6.
+    // SOCD is resolved post-remap in firmware, so pairs use logical buttons.
     const aLogical = resolveLogicalButton(aBtns[0], rmap) || aBtns[0];
     const bLogical = resolveLogicalButton(bBtns[0], rmap) || bBtns[0];
     pairs.push([aLogical, bLogical]);
@@ -3125,11 +2933,7 @@ function removeSocdPair(profile, btnA, btnB) {
   ));
 }
 
-// "NONE" is a UI-only sentinel that means "no socdPairs entry for this axis".
-// Selecting it removes any existing entry; selecting any real SOCD_* type
-// creates or updates one. This matches the official configurator's behavior
-// and the firmware semantics (a missing pair = no SOCD rule, distinct from
-// SOCD_NEUTRAL which is an explicit cancel-both rule).
+// UI-only sentinel: "no socdPairs entry for this axis" (distinct from SOCD_NEUTRAL).
 const SOCD_NONE = 'NONE';
 
 function renderSocdList(profile) {
@@ -3219,13 +3023,8 @@ function renderRemapList(profile) {
   const chk = $('chk-remap-mode');
   if (chk) chk.checked = remapViewMode === 'advanced';
 
-  // Keyboard / custom modes don't use profile.buttonRemapping — the firmware
-  // reads keyboardModeConfig.buttonsToKeycodes (keyboard) or
-  // customModes[i].digitalButtonMappings / stickDirectionMappings (custom).
-  // Rows here are interactive: the user can swap the physical button on the
-  // left and the output (custom) or keycode (keyboard) on the right; the ✕
-  // clears the binding. + Add Remap seeds a new binding on the first
-  // currently-unbound physical button.
+  // Keyboard / custom modes read their own binding tables, not buttonRemapping.
+  // Rows are interactive: swap phys or output/keycode; ✕ clears; + adds on first unbound phys.
   if (isKeyboardProfile(profile)) {
     const kb = getKeyboardConfig(profile);
     const entries = (kb?.buttonsToKeycodes || []).filter(e => e.button && e.button !== 'BTN_UNSPECIFIED');
@@ -3250,8 +3049,7 @@ function renderRemapList(profile) {
           rows.push({ phys: btn, output: STICK_DIR_TO_OUTPUT_ID[i] });
         }
       });
-      // Sort by output position in POPUP_OUTPUT_ORDER for a predictable order
-      // (matches the simple controller-mode view).
+      // Sort by POPUP_OUTPUT_ORDER position — matches the simple view.
       rows.sort((a, b) => {
         const ia = POPUP_OUTPUT_ORDER.indexOf(a.output);
         const ib = POPUP_OUTPUT_ORDER.indexOf(b.output);
@@ -3355,12 +3153,7 @@ function tooltipOutputLabel(style, keyboardMode) {
   return style.label || '';
 }
 
-// Simple view: built from the effective mapping (physBtn + resolved outputId).
-// Changes use setRemap() to create/update buttonRemapping entries as needed.
-// X disables the button (adds a disabled remap entry → hidden from simple view).
-// Sort-key helper so remap rows show in a consistent device-layout order
-// (matches the BUTTON_LAYOUT array which already follows the physical SVG
-// arrangement).
+// Sort-key helper so remap rows follow BUTTON_LAYOUT (physical device order).
 const _PHYS_BTN_ORDER = (() => {
   const m = new Map();
   BUTTON_LAYOUT.forEach((b, i) => m.set(b.id, i));
@@ -3370,9 +3163,7 @@ function physBtnSortIndex(btnId) {
   return _PHYS_BTN_ORDER.get(btnId) ?? 999;
 }
 
-// Return the first physical button (in BUTTON_LAYOUT order, excluding MBs)
-// that has no binding under the active mode's data model. Used by + Add
-// Remap to pick a sensible default phys for a new binding.
+// First unbound non-MB physical button in BUTTON_LAYOUT order — used by + Add Remap.
 function findFirstUnboundPhysButton(profile) {
   const bound = new Set();
   if (isCustomProfile(profile)) {
@@ -3412,11 +3203,7 @@ function physButtonOptionsWithUnbound(selectedBtnId) {
   return `<option value=""${unboundSelected}>(unbound)</option>` + physButtonOptions(selectedBtnId);
 }
 
-// CUSTOM-mode remap row. Both sides are interactive selects.
-//  - Phys select: changing it moves the binding to a different button.
-//  - Output select: changing it rebinds this physical button to a different
-//    output (digital or stick direction).
-//  - ✕: clears the binding.
+// CUSTOM remap row: phys select moves binding, output select rebinds, ✕ clears.
 function buildCustomRemapRow(physBtn, currentOutputId, profile) {
   const row = document.createElement('div');
   row.className = 'remap-item';
@@ -3487,12 +3274,8 @@ function buildKeyboardRemapRow(physBtn, keycode, profile) {
   });
 
   row.querySelector('.remap-keycode-btn').addEventListener('click', (e) => {
-    // Delegate to the assign popup for capture — it already has the
-    // "press any key" UI + Esc-cancels-capture behavior.
-    // Stop propagation so the document-level "close popup on outside click"
-    // handler doesn't fire on the same click and immediately close what we
-    // just opened. The remap row sits outside both #output-popup and any
-    // .btn-group, so without this the popup would flicker open and close.
+    // Reuse the assign popup's key-capture UI. stopPropagation prevents the
+    // outside-click handler from immediately closing what we just opened.
     e.stopPropagation();
     openOutputPopup(physBtn);
   });
@@ -3636,19 +3419,11 @@ function findPhysicalButtonForOutput(outputId, modeId) {
 }
 
 // Outputs that are always assignable regardless of mode (system / menu buttons).
-// "System" outputs that any non-MB button is allowed to be bound to even when
-// the active mode map doesn't natively produce them. LS / RS are deliberately
-// NOT here: only modes whose firmware actually wires outputs.leftStickClick /
-// rightStickClick (FGC + CUSTOM) should let the user bind them. Melee / PM /
-// Ultimate / RoA(2) / Smash64 never set those output fields, so binding LS
-// to a button would silently do nothing on the device.
+// Non-MB buttons can bind these even if the mode map doesn't natively produce them.
+// LS/RS excluded — only FGC + CUSTOM wire outputs.leftStickClick / rightStickClick.
 const SYSTEM_OUTPUTS = new Set(['start', 'select', 'capture', 'home']);
 
-// Backends whose protocol has an LS / RS stick-click button. GameCube, N64,
-// NES, SNES, and Configurator either don't support stick clicks at all or
-// don't apply here. If a profile's applicableBackends contains *none* of
-// these, binding 'ls' / 'rs' is silently dropped at the firmware layer — so
-// we strip those outputs from the popup grid to match.
+// Backends that carry LS / RS. Console backends drop stick clicks in firmware.
 const BACKENDS_WITH_STICK_CLICK = new Set([
   'COMMS_BACKEND_DINPUT',
   'COMMS_BACKEND_XINPUT',
@@ -3661,24 +3436,13 @@ function profileSupportsStickClick(profile) {
   return backends.some(b => BACKENDS_WITH_STICK_CLICK.has(b));
 }
 
-// Set of outputs available in the current profile's mode.
-// Always includes SYSTEM_OUTPUTS (start/select/capture/home) so those can be
-// bound to any button regardless of mode.
-//
-// CUSTOM mode bypasses MODE_OUTPUT_MAP: any DigitalOutput or
-// StickDirectionButton the firmware supports is bindable.
-//
-// 'ls' / 'rs' (stick clicks) are only available when the mode's map actually
-// wires them (FGC + CUSTOM) AND the profile has at least one backend that
-// carries them (DInput / XInput / Switch — not GameCube / N64 / NES / SNES).
+// Outputs bindable in this profile's mode. Adds SYSTEM_OUTPUTS everywhere,
+// virtual M{n}/T{n} for CUSTOM. Strips ls/rs when no backend carries them.
 function availableOutputs(profile) {
   const modeId = profile?.modeId;
   let base;
   if (modeId === 'MODE_CUSTOM') {
     base = new Set(CUSTOM_MODE_OUTPUTS);
-    // Append virtual outputs for each modifier group and trigger entry
-    // currently defined on this profile's custom config — these become the
-    // popup-assignable "M1, M2, … / T1, T2, …" buttons.
     const cc = getCustomConfig(profile);
     if (cc) {
       modifierGroups(cc).forEach((_g, i) => base.add(modifierOutputId(i)));
@@ -3713,13 +3477,7 @@ function openOutputPopup(btnId, _evt) {
 
   const rainbowMode = isRainbowAnim(profile);
 
-  // Toggle popup sections.
-  //  - keyboard mode: hide output grid, show key-capture box, hide un-map for non-remappable buttons
-  //  - controller mode: hide key-capture box, show output grid for remappable buttons
-  //  - rainbow animation: hide the color row + saved palette (the global hue
-  //    shifts hue for every button; per-button color just toggles participation)
-  //    and show a two-button row instead — rainbow-gradient = participate,
-  //    ⊘ = LED off during the animation.
+  // Toggle popup sections per mode (keyboard swaps grid for key-capture; rainbow swaps color row for participate/off toggle).
   $('output-popup-grid').style.display     = (!keyboardMode && remappable) ? '' : 'none';
   $('output-popup-keyboard').style.display = (keyboardMode && remappable)  ? '' : 'none';
   $('output-popup-unmap').style.display    = remappable ? '' : 'none';
@@ -3940,19 +3698,15 @@ function buttonHasBinding(profile, btnId) {
   return resolveButtonOutput(btnId, profile, remapMap(profile)) != null;
 }
 
-// Called after a binding is written. If the button was unassigned before
-// (so we can guess the user is "turning it on" for the first time) and it
-// has an LED but no colour stored, set the LED to the default cyan.
-// Re-bindings preserve whatever the user already had (per the LED spec).
+// After a first-time bind: default LED to cyan. Re-binds keep whatever color was set.
 function autoEnableLedOnAssign(profile, btnId, wasBound) {
   if (wasBound) return;
   if (!hasLED(btnId)) return;
-  if (getButtonColor(profile, btnId) !== 0) return;   // already on, don't clobber
+  if (getButtonColor(profile, btnId) !== 0) return;
   setButtonColor(profile, btnId, DEFAULT_LED_COLOR_INT);
 }
 
-// Called after a binding is cleared (unmap / unbind). Turns the LED off on
-// any LED-capable button. MB1 has no off state on the device, so we skip it.
+// After unbind: LED off (MB1 has no off state; skip).
 function autoDisableLedOnUnassign(profile, btnId) {
   if (!hasLED(btnId)) return;
   if (NON_REMAPPABLE_BUTTONS.has(btnId)) return;
@@ -3965,12 +3719,9 @@ function applyOutput(outputId) {
 
   const wasBound = buttonHasBinding(profile, selectedBtnId);
 
-  // Menu buttons: write to menuButtonIcon (or digitalButtonMappings in CUSTOM mode)
+  // MB: write to menuButtonIcon (CUSTOM: route to digitalButtonMappings — icon is cosmetic).
   if (selectedBtnId.startsWith('BTN_MB')) {
     if (isCustomProfile(profile)) {
-      // Custom mode: menuButtonIcon is cosmetic only (OLED display icon). MB buttons
-      // only produce firmware output when explicitly placed in digitalButtonMappings,
-      // so route the assignment there — same path as any other button in custom mode.
       setCustomButtonOutput(profile, selectedBtnId, outputId);
       autoEnableLedOnAssign(profile, selectedBtnId, wasBound);
       closeOutputPopup();
@@ -3986,15 +3737,9 @@ function applyOutput(outputId) {
     return;
   }
 
-  // CUSTOM mode: write the physical button id directly into the right slot
-  // of digitalButtonMappings[] or stickDirectionMappings[]. Each physical
-  // button is allowed to drive at most one output, so setCustomButtonOutput
-  // first clears it from every slot before writing the new binding. Passing
-  // mode='additional' matches how controller-mode remaps work: if another
-  // button is already the primary for this output, add the current button as
-  // a duplicate binding (both fire the output) rather than moving. When the
-  // output is unbound or already primary'd by this same button, the helper
-  // silently falls back to 'primary' — no-op or first-time assignment.
+  // CUSTOM: 'additional' mirrors controller-mode remap behaviour — adds a
+  // duplicate binding when another button already primaries the output;
+  // silently falls back to 'primary' when unbound or same button.
   if (isCustomProfile(profile)) {
     setCustomButtonOutput(profile, selectedBtnId, outputId, 'additional');
     autoEnableLedOnAssign(profile, selectedBtnId, wasBound);
@@ -4003,8 +3748,7 @@ function applyOutput(outputId) {
     return;
   }
 
-  // Main buttons: figure out which physical button produces this output in this mode,
-  // then write a buttonRemapping entry (selectedBtn -> phys).
+  // Controller: remap selectedBtn to the phys that natively produces outputId.
   const phys = findPhysicalButtonForOutput(outputId, profile.modeId);
   if (!phys) { closeOutputPopup(); return; }
   setRemap(selectedBtnId, phys);
@@ -4030,30 +3774,18 @@ function unmapSelected() {
       profile.menuButtonIcon[mbIdx] = 'OUT_UNSPECIFIED';
     }
   } else if (isCustomProfile(profile)) {
-    // CUSTOM mode: clear this physical button from any custom-mode slot it
-    // currently occupies (digital output or stick direction).
     clearCustomButtonBinding(profile, selectedBtnId);
   } else {
-    // Disable button: { physicalButton: BTN_X } with no activates.
-    setRemap(selectedBtnId, null);
+    setRemap(selectedBtnId, null);   // explicit disable
   }
   autoDisableLedOnUnassign(profile, selectedBtnId);
   closeOutputPopup();
   renderAll();
 }
 
-// CUSTOM mode write helpers --------------------------------------------------
-//
-// digitalButtonMappings[] is indexed by (DigitalOutput - 1); stickDirection-
-// Mappings[] is indexed by (StickDirectionButton - 1). To bind a physical
-// button to a given output we (1) clear any prior slot it occupied and (2)
-// write its id into the new slot, padding the array with BTN_UNSPECIFIED if
-// the target index is beyond the array's current length.
+// CUSTOM write helpers ------------------------------------------------------
 
-// Return the physical button that currently owns the primary slot for a
-// digital or stick output in CUSTOM mode. Returns null if the slot is empty
-// or the output isn't one of the primary-slot outputs (modifier / trigger
-// outputs don't use this pattern).
+// Physical button owning the primary slot for a digital/stick output, or null.
 function customPrimaryForOutput(cc, outputId) {
   if (!cc) return null;
   if (outputId in OUTPUT_ID_TO_DIGITAL_INDEX) {
@@ -4067,15 +3799,10 @@ function customPrimaryForOutput(cc, outputId) {
   return null;
 }
 
-// setCustomButtonOutput mode selector:
-//   'primary'    (default) — this button becomes the primary for the output;
-//                             any prior primary is removed.
-//   'additional' — this button also fires the output alongside whichever
-//                  button is already the primary. Only valid for digital /
-//                  stick outputs; silently falls back to 'primary' for
-//                  modifier / trigger outputs (which have their own group
-//                  semantics), or when no primary exists yet, or when the
-//                  requested button is already the primary.
+// mode='primary' overwrites the slot; mode='additional' adds a buttonRemapping
+// entry so both this button and the existing primary fire the same output
+// (via HandleRemap). Falls back to primary when there's no existing primary,
+// when it's the same button, or when the output isn't digital/stick.
 function setCustomButtonOutput(profile, btnId, outputId, mode = 'primary') {
   const cc = ensureCustomConfig(profile);
   if (!cc) return;
@@ -4084,18 +3811,11 @@ function setCustomButtonOutput(profile, btnId, outputId, mode = 'primary') {
       && (outputId in OUTPUT_ID_TO_DIGITAL_INDEX || outputId in OUTPUT_ID_TO_STICK_INDEX)) {
     const primary = customPrimaryForOutput(cc, outputId);
     if (primary && primary !== btnId) {
-      // Detach btnId from anywhere it was previously bound, then add a
-      // buttonRemapping entry that funnels its press into the primary's bit.
-      // The firmware's HandleRemap (CustomControllerMode inherits it from
-      // ControllerMode) will OR the two together, so both physical buttons
-      // trigger the output.
       clearCustomButtonBinding(profile, btnId);
       if (!Array.isArray(profile.buttonRemapping)) profile.buttonRemapping = [];
       profile.buttonRemapping.push({ physicalButton: btnId, activates: primary });
       return;
     }
-    // No existing primary (or same button asking to be re-added as primary);
-    // fall through and let the primary path handle it.
   }
 
   clearCustomButtonBinding(profile, btnId);
@@ -4115,9 +3835,7 @@ function setCustomButtonOutput(profile, btnId, outputId, mode = 'primary') {
     }
     cc.stickDirectionMappings[idx] = btnId;
   } else if (isModifierOutputId(outputId)) {
-    // Modifier group: write [btnId] to every modifier entry that shares the
-    // group's button-set. The user is moving the activation condition for
-    // the entire M-group (all its axes) to this physical button.
+    // Move the M-group's activation to btnId across all its axes.
     const groupIdx = parseGroupIdx(outputId);
     const groups = modifierGroups(cc);
     const target = groups[groupIdx];
@@ -4137,11 +3855,8 @@ function clearCustomButtonBinding(profile, btnId) {
   const cc = getCustomConfig(profile);
   if (!cc) return;
 
-  // If btnId is a PRIMARY for a digital or stick slot AND other buttons have
-  // additional-binding remaps pointing at it (`{X, activates: btnId}`),
-  // promote one of them to the primary slot so those additional bindings
-  // don't silently break when the primary is cleared. Any remaining remaps
-  // get repointed at the promoted button.
+  // If btnId is a primary with additional-bind dependents, promote the first
+  // dependent into its slot and repoint the rest so their bindings stay live.
   const remap = Array.isArray(profile.buttonRemapping) ? profile.buttonRemapping : [];
   const findFirstDependent = () =>
     remap.find(r => r.physicalButton !== btnId && r.activates === btnId)?.physicalButton;
@@ -4153,8 +3868,6 @@ function clearCustomButtonBinding(profile, btnId) {
       const heir = findFirstDependent();
       if (heir) {
         arr[i] = heir;
-        // Drop the heir's own remap (it's now the primary) and repoint any
-        // other dependents at the heir so they keep firing the output.
         for (let j = remap.length - 1; j >= 0; j--) {
           const r = remap[j];
           if (r.physicalButton === heir && r.activates === btnId) {
@@ -4171,16 +3884,12 @@ function clearCustomButtonBinding(profile, btnId) {
   clearAndPromote(cc.digitalButtonMappings);
   clearAndPromote(cc.stickDirectionMappings);
 
-  // Drop any buttonRemapping entry FROM btnId (either explicit-disable or a
-  // now-stale additional-bind entry). Do this after the promotion step so we
-  // don't remove an entry we might want to promote.
+  // Drop remap entries FROM btnId (must run after promotion so heirs survive).
   if (Array.isArray(profile.buttonRemapping)) {
     profile.buttonRemapping = profile.buttonRemapping.filter(r => r.physicalButton !== btnId);
   }
-  // Modifier groups: drop btnId from any entry's buttons array. If a group
-  // ends up with no buttons we LEAVE the entries in place (buttons=[] is
-  // safely skipped by the firmware via the `mask != 0` check in
-  // all_buttons_held) so the M-group keeps its slot in the UI.
+  // M-group entries with empty buttons stay (firmware short-circuits mask=0),
+  // triggers with BTN_UNSPECIFIED stay (get_button returns false) — keeps UI slots.
   if (Array.isArray(cc.modifiers)) {
     for (const m of cc.modifiers) {
       if (Array.isArray(m.buttons) && m.buttons.includes(btnId)) {
@@ -4188,8 +3897,6 @@ function clearCustomButtonBinding(profile, btnId) {
       }
     }
   }
-  // Triggers: same idea — clearing leaves the entry with button=UNSPECIFIED,
-  // which get_button() short-circuits to false in firmware.
   if (Array.isArray(cc.analogTriggerMappings)) {
     for (const t of cc.analogTriggerMappings) {
       if (t.button === btnId) t.button = 'BTN_UNSPECIFIED';
@@ -4210,17 +3917,8 @@ function setRemap(physBtnId, activates) {
 // ---------------------------------------------------------------------------
 // Full render
 // ---------------------------------------------------------------------------
-// Show/hide console-specific platform tabs (GameCube, Nintendo 64) based on
-// the active profile's backends, and auto-switch the display style when a
-// console backend becomes active or goes away.
-//
-//  - If the GC backend is enabled, the GameCube tab is shown and (when the
-//    user isn't already on a console tab) we auto-switch to it. Same for N64.
-//  - If the currently-selected console tab's backend disappears, we fall back
-//    to whichever other console tab is still active, or 'xbox' as a last resort.
-//  - If both GC and N64 are enabled on a profile, both tabs are visible and
-//    the user picks. GameCube wins the auto-switch tie because it's listed
-//    first in CONSOLE_TABS.
+// Console tabs shown when the matching backend is enabled; auto-switches to
+// the first enabled tab. GameCube wins ties by list order.
 const CONSOLE_TABS = [
   { platform: 'gamecube', backend: 'COMMS_BACKEND_GAMECUBE' },
   { platform: 'n64',      backend: 'COMMS_BACKEND_N64'      },
@@ -4228,14 +3926,10 @@ const CONSOLE_TABS = [
 
 function updateGcTab() {
   const profile = currentProfile();
-  // Keyboard mode doesn't emit gamepad outputs, so the platform display style
-  // (Xbox/PS/Switch/GameCube/N64) doesn't apply — hide the whole bar.
+  // Keyboard mode doesn't emit gamepad outputs — hide the platform bar.
   const platformBar = document.querySelector('.platform-bar');
   if (platformBar) platformBar.classList.toggle('hidden', isKeyboardProfile(profile));
 
-  // Toggle each console tab and find the first one whose backend is enabled
-  // (used both for the auto-switch target and the fallback when a different
-  // console tab's backend disappears).
   let firstEnabled = null;
   const enabledByPlatform = {};
   for (const { platform, backend } of CONSOLE_TABS) {
@@ -4297,22 +3991,11 @@ function wireSettingsHandlers() {
     const newMode = $('set-mode-id').value;
     if (oldMode === newMode) return;
 
-    // Preserve every button's effective *output* across the mode change.
-    // For each button (whether bound explicitly or via the old mode's native
-    // default) we add a remap entry that points it at whichever button in the
-    // new mode natively produces the same output, so e.g. LF2 stays "L-Down"
-    // when going from Ultimate to FGC instead of becoming "D-Down".
+    // Rewrite binds so each button keeps its effective output under the new mode.
     preserveOutputsAcrossModeChange(p, oldMode, newMode);
 
-    // Keyboard-mode backend handling. Backends are hidden in keyboard mode, so
-    // the user can't manage them while in that state — reset them at the
-    // transition boundary instead:
-    //   * Entering keyboard mode: DInput only (the only backend that emits
-    //     HID keyboard reports).
-    //   * Leaving keyboard mode: restore the USB triplet so common gamepad
-    //     paths work out of the box; the user can then check/uncheck the
-    //     console backends to taste.
-    // (Non-keyboard ↔ non-keyboard transitions still leave backends alone.)
+    // Keyboard backends: DInput-only on entry (only backend that emits HID kbd),
+    // restore USB triplet on exit. Non-keyboard transitions leave backends alone.
     if (newMode === 'MODE_KEYBOARD' && oldMode !== 'MODE_KEYBOARD') {
       p.applicableBackends = ['COMMS_BACKEND_DINPUT'];
     } else if (oldMode === 'MODE_KEYBOARD' && newMode !== 'MODE_KEYBOARD') {
@@ -4320,33 +4003,21 @@ function wireSettingsHandlers() {
     }
 
     p.modeId = newMode;
-    // Entering CUSTOM: preserveOutputsAcrossModeChange has already written
-    // this profile's effective binds into customModeConfig via
-    // translateControllerToCustom, including additional-binding remaps for
-    // outputs that were bound to multiple physical buttons in the source
-    // mode. Run sanitize afterwards so any explicit-disable entries from the
-    // source mode are dropped (they'd silently kill buttons the user then
-    // binds under CUSTOM) while valid additional-binding entries stay.
+    // Entering CUSTOM: drop source mode's explicit-disables, keep multi-bind entries.
     if (newMode === 'MODE_CUSTOM' && oldMode !== 'MODE_CUSTOM') {
       sanitizeCustomButtonRemapping(p);
     }
-    // Leaving CUSTOM: translateCustomToController has already written the
-    // buttonRemapping entries needed to preserve the CUSTOM binds. Only extra
-    // work is seeding NEUTRAL SocdPairs if the profile has none — so the axis
-    // rows default to Neutral, not "None", when the user arrives at the new
-    // controller mode's SOCD panel.
+    // Leaving CUSTOM with no SOCDs: seed NEUTRAL so axis rows aren't "None".
     if (oldMode === 'MODE_CUSTOM' && newMode !== 'MODE_CUSTOM'
         && (!Array.isArray(p.socdPairs) || p.socdPairs.length === 0)) {
       seedNeutralSocdPairs(p);
     }
-    // Legacy snapshot fields from older versions of this handler — strip on
-    // any mode change so they can't accidentally reach the wire.
+    // Legacy fields from an older handler; scrub in case they persisted in memory.
     delete p._preCustomButtonRemapping;
     delete p._preCustomModeId;
-    // applicableBackends / menuButtonIcon / rgbConfig stay untouched.
     renderProfileList();
-    renderSettingsPanel();   // toggle backends/remap visibility
-    buildControllerSVG();    // re-render with new mode's labels
+    renderSettingsPanel();
+    buildControllerSVG();
     updateGcTab();
   });
 
@@ -4359,12 +4030,8 @@ function wireSettingsHandlers() {
     if (!Number.isNaN(v)) cc.stickRange = Math.max(0, Math.min(127, v));
   });
 
-  // Custom mode: add a new M-group. Materialise one AnalogModifier entry per
-  // stick axis with multiplier = 0 (safe default: forces the axis to neutral
-  // when the modifier is held, for both Override and Compound modes). The user
-  // edits values from here. Empty `buttons` means the modifier never fires
-  // until the user binds a phys via the popup grid (firmware's
-  // all_buttons_held returns false on mask=0).
+  // Add M-group: one entry per axis, multiplier 0 (neutral in both combination modes).
+  // Empty `buttons` is safe — all_buttons_held short-circuits on mask=0.
   $('btn-add-custom-modifier').addEventListener('click', () => {
     const p = currentProfile();
     if (!p) return;
@@ -4382,9 +4049,7 @@ function wireSettingsHandlers() {
     buildControllerSVG();
   });
 
-  // Custom mode: add a new T-entry. Default to LT with full-press value (255).
-  // The user can drop it for light/mid shield as needed. Button left as
-  // BTN_UNSPECIFIED — firmware's get_button short-circuits on that.
+  // Add T-entry: LT, full-press (255), unbound button. Safe — get_button short-circuits on BTN_UNSPECIFIED.
   $('btn-add-custom-trigger').addEventListener('click', () => {
     const p = currentProfile();
     if (!p) return;
@@ -4474,13 +4139,7 @@ function wireSettingsHandlers() {
     }
   });
 
-  // "Apply to mapped buttons" — paints every mapped button.
-  //  - Static animation: paints the static color from the hex input.
-  //  - Rainbow animation: paints 0xFFFFFF (firmware's "participate" sentinel),
-  //    so all mapped buttons join the rainbow. Buttons not painted here stay
-  //    dark during the animation. The user clicks this only when they want
-  //    the rainbow to cover everything mapped.
-  // Both Apply buttons (one per mode block) share this handler.
+  // "Apply to mapped buttons": paints static color, or 0xFFFFFF (rainbow "participate" sentinel).
   const applyRgbToMapped = () => {
     const p = currentProfile();
     if (!p) return;
@@ -4584,10 +4243,7 @@ function wireSettingsHandlers() {
     if (p) renderRemapList(p);
   });
 
-  // Populate the preset dropdown once from the built-in defaults. Each option
-  // corresponds to one of the 13 factory-default profiles bundled in
-  // DEFAULT_CONFIG_JSON. Keeping the raw name (matches profile.name in the
-  // defaults JSON) means we can look the preset back up by that value on Apply.
+  // Populate preset dropdown from DEFAULT_CONFIG_JSON; option value = preset name.
   const presetSel = $('remap-preset-select');
   try {
     const defaults = JSON.parse(DEFAULT_CONFIG_JSON);
@@ -4629,13 +4285,8 @@ function wireSettingsHandlers() {
   });
 }
 
-// Copy the mode-specific fields (modeId, buttonRemapping, socdPairs,
-// applicableBackends, menuButtonIcon) from a factory-default preset into the
-// target profile. For MODE_KEYBOARD presets, also copy the referenced
-// KeyboardModeConfig contents into the target's keyboardModeConfig so the
-// preset's keycode bindings come along. LED colors (rgbConfig) and custom-
-// mode data (customModeConfig) are left alone — those are user preferences
-// not tied to the preset.
+// Copy a factory preset's binds, SOCDs, backends, and menu icons onto profile.
+// Never changes profile.modeId; cross-mode binds translate via preserveOutputsAcrossModeChange.
 function applyPresetToProfile(profile, presetName) {
   let defaults;
   try {
@@ -4647,9 +4298,7 @@ function applyPresetToProfile(profile, presetName) {
   const targetMode = profile.modeId;
   const presetMode = preset.modeId;
 
-  // SOCD pairs, menu-button icons, and backends come from the preset directly —
-  // they aren't mode-specific in a way that requires translation. Keyboard
-  // profiles keep DInput-only regardless of the preset.
+  // Non-bind fields transfer directly. Keyboard stays DInput-only regardless.
   profile.socdPairs      = JSON.parse(JSON.stringify(preset.socdPairs || []));
   profile.menuButtonIcon = [...(preset.menuButtonIcon || [
     'OUT_UNSPECIFIED','OUT_UNSPECIFIED','OUT_UNSPECIFIED','OUT_UNSPECIFIED',
@@ -4659,11 +4308,7 @@ function applyPresetToProfile(profile, presetName) {
     ? ['COMMS_BACKEND_DINPUT']
     : [...(preset.applicableBackends || USB_BACKENDS)];
 
-  // Button binds: transfer into the target profile's own mode format. If the
-  // modes match, copy verbatim. Otherwise translate via the same helper used
-  // by mode-switching, which knows how to move binds between CUSTOM and each
-  // controller mode. Keyboard is a separate domain — we only transfer binds
-  // when both ends are keyboard.
+  // Binds: verbatim on mode match; translate cross-mode; keyboard only when both are keyboard.
   if (targetMode === presetMode) {
     if (targetMode === 'MODE_KEYBOARD') {
       const srcKb = defaults.keyboardModes?.[(preset.keyboardModeConfig || 0) - 1];
@@ -4675,26 +4320,16 @@ function applyPresetToProfile(profile, presetName) {
       profile.buttonRemapping = JSON.parse(JSON.stringify(preset.buttonRemapping || []));
     }
   } else if (presetMode !== 'MODE_KEYBOARD' && targetMode !== 'MODE_KEYBOARD') {
-    // Cross-mode preset apply: install the preset's controller-mode binds
-    // onto the profile temporarily, then run the shared translation. The
-    // profile keeps its own modeId — translation only touches the binding
-    // fields (buttonRemapping and, for CUSTOM targets, customModeConfig).
+    // Cross-mode: install preset binds temporarily, translate to target format.
     profile.buttonRemapping = JSON.parse(JSON.stringify(preset.buttonRemapping || []));
     preserveOutputsAcrossModeChange(profile, presetMode, targetMode);
     if (targetMode === 'MODE_CUSTOM') {
-      // Translation wrote into customModeConfig; buttonRemapping was the input
-      // and is now residual. CUSTOM must not carry buttonRemapping entries
-      // (see mode-change handler for the reason).
-      profile.buttonRemapping = [];
+      profile.buttonRemapping = [];   // residual; CUSTOM doesn't carry remaps
     }
   }
-  // Any remaining case (keyboard preset on non-keyboard target, or vice versa)
-  // leaves the profile's binds untouched — keyboard binds are HID keycodes
-  // which don't translate meaningfully to controller output ids.
+  // Keyboard preset on non-keyboard (or vice versa): binds untouched — different domains.
 
-  // Light up the newly-active buttons with the profile's default LED colour
-  // (same behaviour as clicking "Apply to active" in Button Lighting) so the
-  // preset gives a visually complete result, not just the binds.
+  // Paint LEDs on newly-active buttons (matches "Apply to active" in Button Lighting).
   const rgb = ensureRgbConfig(profile);
   const defaultColor = (rgb.defaultColor != null ? Number(rgb.defaultColor) >>> 0 : DEFAULT_LED_COLOR_INT);
   paintActiveButtons(profile, defaultColor);
@@ -4752,9 +4387,7 @@ function openHsvPicker(anchorEl, colorInt, onChange) {
   const pr = picker.getBoundingClientRect();
   const ar = anchorEl.getBoundingClientRect();
   const gap = 10;
-  // Prefer placing the picker to the LEFT of the anchor so it doesn't cover
-  // the hex input / "Apply to mapped buttons" controls that sit to the right
-  // of the swatch. Fall back to the right side only if there isn't room.
+  // Prefer left of anchor to avoid covering the hex input / Apply controls.
   let left = ar.left - pr.width - gap;
   if (left < 8) left = ar.right + gap;
   if (left + pr.width > window.innerWidth - 12) left = window.innerWidth - pr.width - 12;
@@ -4822,13 +4455,8 @@ function wireHsvPickerHandlers() {
 }
 
 // ---------------------------------------------------------------------------
-// Controller-button hover tooltips
-//
-// Each .btn-group in the SVG carries a data-tooltip attribute ("LF2 (L-Down)").
-// We use mouseover/mouseout for target detection (fires once per transition
-// instead of ~60 Hz) and reserve mousemove for cursor-tracking while the
-// tooltip is already visible. The rect is measured once at reveal and reused
-// for the rest of the hover, avoiding a layout-read-after-write on each move.
+// Controller-button hover tooltips (data-tooltip on .btn-group). Uses
+// mouseover/mouseout for target changes, mousemove only while visible.
 // ---------------------------------------------------------------------------
 function wireButtonTooltips() {
   const TOOLTIP_DELAY_MS = 500;
@@ -4842,9 +4470,7 @@ function wireButtonTooltips() {
   let timer  = null;
   let cachedW = 0;
   let cachedH = 0;
-  // Latest cursor position over the SVG. Updated on every mousemove so the
-  // dwell-delay setTimeout shows the tooltip at the cursor's CURRENT location,
-  // not where the cursor first entered the button.
+  // Latest cursor position — dwell-delay uses current, not entry, coords.
   let lastX = 0;
   let lastY = 0;
 
@@ -5231,13 +4857,7 @@ function dismissConfirmPopup() {
   activeConfirmPopup = null;
 }
 
-// ---------------------------------------------------------------------------
-// Default config (embedded JSON)
-// Source: GlyphUserProfiles.json — the official Limit Labs default profiles.
-// Each non-default-output button is explicitly listed in buttonRemapping with
-// an empty `activates` field, marking it as disabled in that profile. This is
-// how the original configurator decides which buttons to gray out.
-// ---------------------------------------------------------------------------
+// Embedded "Load Defaults" payload — the official Limit Labs default profiles.
 const DEFAULT_CONFIG_JSON = `{"gameModeConfigs":[{"modeId":"MODE_MELEE","name":"Melee","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP_NO_REAC"}],"buttonRemapping":[{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":1,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_PROJECT_M","name":"Brawl","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP_NO_REAC"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP_NO_REAC"}],"buttonRemapping":[{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":2,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_ULTIMATE","name":"Ultimate","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP"}],"buttonRemapping":[{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":3,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_FGC","name":"Split FGC","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_LT1","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_RT1","activates":"BTN_LT1"},{"physicalButton":"BTN_LF5","activates":"BTN_LT2"},{"physicalButton":"BTN_RF9","activates":"BTN_RT1"},{"physicalButton":"BTN_LF4"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT2"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_RT2"},{"physicalButton":"BTN_RT3"},{"physicalButton":"BTN_RT4"},{"physicalButton":"BTN_RT5"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":4,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_XB_START"]},{"modeId":"MODE_FGC","name":"FGC","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_LT1","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_RF1","activates":"BTN_RF4"},{"physicalButton":"BTN_RF5","activates":"BTN_RF8"},{"physicalButton":"BTN_LF8","activates":"BTN_LF3"},{"physicalButton":"BTN_LF7","activates":"BTN_LF2"},{"physicalButton":"BTN_LF6","activates":"BTN_LF1"},{"physicalButton":"BTN_LT6","activates":"BTN_LT1"},{"physicalButton":"BTN_RF10","activates":"BTN_RF1"},{"physicalButton":"BTN_RF11","activates":"BTN_RF2"},{"physicalButton":"BTN_RF12","activates":"BTN_RF3"},{"physicalButton":"BTN_RF13","activates":"BTN_RF5"},{"physicalButton":"BTN_RF14","activates":"BTN_RF6"},{"physicalButton":"BTN_RF15","activates":"BTN_RF7"},{"physicalButton":"BTN_RF16","activates":"BTN_LT2"},{"physicalButton":"BTN_LF1"},{"physicalButton":"BTN_LF2"},{"physicalButton":"BTN_LF3"},{"physicalButton":"BTN_LF4"},{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LT1"},{"physicalButton":"BTN_LT2"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_RF2"},{"physicalButton":"BTN_RF3"},{"physicalButton":"BTN_RF4"},{"physicalButton":"BTN_RF6"},{"physicalButton":"BTN_RF7"},{"physicalButton":"BTN_RF8"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RT1"},{"physicalButton":"BTN_RT2"},{"physicalButton":"BTN_RT3"},{"physicalButton":"BTN_RT4"},{"physicalButton":"BTN_RT5"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":5,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_XB_START"]},{"modeId":"MODE_64","name":"Smash64","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_RT2"},{"physicalButton":"BTN_RT3"},{"physicalButton":"BTN_RT4"},{"physicalButton":"BTN_RT5"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"},{"physicalButton":"BTN_MB4"},{"physicalButton":"BTN_MB5"},{"physicalButton":"BTN_MB6"}],"rgbConfig":6,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_N64"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_START"]},{"modeId":"MODE_RIVALS_OF_AETHER","name":"RoA","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_LF7","buttonDir2":"BTN_LT6"}],"buttonRemapping":[{"physicalButton":"BTN_RF7","activates":"BTN_LF7"},{"physicalButton":"BTN_RF8","activates":"BTN_LT6"},{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":7,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_RIVALS2","name":"RoA2","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_LF7","buttonDir2":"BTN_LT6"}],"buttonRemapping":[{"physicalButton":"BTN_RF7","activates":"BTN_LF7"},{"physicalButton":"BTN_RF8","activates":"BTN_LT6"},{"physicalButton":"BTN_LF5"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":8,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_MELEE","name":"GameCube","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_LF2","activates":"BTN_RF4"},{"physicalButton":"BTN_LF6","activates":"BTN_LF8"},{"physicalButton":"BTN_LF5","activates":"BTN_LF2"},{"physicalButton":"BTN_RF13","activates":"BTN_LT6"},{"physicalButton":"BTN_RF10","activates":"BTN_LF7"},{"physicalButton":"BTN_RF11","activates":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF4"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":9,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_GAMECUBE"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_MELEE","name":"N64","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_RF4","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_RT3","buttonDir2":"BTN_RT5","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_RT2","buttonDir2":"BTN_RT4","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_LF2","activates":"BTN_RF4"},{"physicalButton":"BTN_RF2","activates":"BTN_RF5"},{"physicalButton":"BTN_LF6","activates":"BTN_LF8"},{"physicalButton":"BTN_LF5","activates":"BTN_LF2"},{"physicalButton":"BTN_RF13","activates":"BTN_LT6"},{"physicalButton":"BTN_RF11","activates":"BTN_LF6"},{"physicalButton":"BTN_RF10","activates":"BTN_LF7"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF4"},{"physicalButton":"BTN_RF5"},{"physicalButton":"BTN_RF6"},{"physicalButton":"BTN_RF7"},{"physicalButton":"BTN_RF8"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"}],"rgbConfig":10,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT","COMMS_BACKEND_XINPUT","COMMS_BACKEND_NINTENDO_SWITCH","COMMS_BACKEND_N64"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_HOME","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_FGC","name":"SNES","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_LT1","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_LF2","activates":"BTN_LT1"},{"physicalButton":"BTN_LT1","activates":"BTN_RF8"},{"physicalButton":"BTN_RT1","activates":"BTN_RF7"},{"physicalButton":"BTN_RF1","activates":"BTN_RF2"},{"physicalButton":"BTN_RF2","activates":"BTN_RF1"},{"physicalButton":"BTN_RF5","activates":"BTN_RF6"},{"physicalButton":"BTN_RF6","activates":"BTN_RF5"},{"physicalButton":"BTN_LF5","activates":"BTN_LF2"},{"physicalButton":"BTN_LF4"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT2"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF3"},{"physicalButton":"BTN_RF4"},{"physicalButton":"BTN_RF7"},{"physicalButton":"BTN_RF8"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_RT2"},{"physicalButton":"BTN_RT3"},{"physicalButton":"BTN_RT4"},{"physicalButton":"BTN_RT5"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"},{"physicalButton":"BTN_MB4"},{"physicalButton":"BTN_MB5"}],"rgbConfig":11,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_SNES"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_FGC","name":"NES","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_NEUTRAL"},{"buttonDir1":"BTN_LF2","buttonDir2":"BTN_LT1","socdType":"SOCD_NEUTRAL"}],"buttonRemapping":[{"physicalButton":"BTN_LF2","activates":"BTN_LT1"},{"physicalButton":"BTN_RF1","activates":"BTN_RF2"},{"physicalButton":"BTN_RF2","activates":"BTN_RF1"},{"physicalButton":"BTN_LF5","activates":"BTN_LF2"},{"physicalButton":"BTN_LF4"},{"physicalButton":"BTN_LF6"},{"physicalButton":"BTN_LF7"},{"physicalButton":"BTN_LF8"},{"physicalButton":"BTN_LT1"},{"physicalButton":"BTN_LT2"},{"physicalButton":"BTN_LT3"},{"physicalButton":"BTN_LT4"},{"physicalButton":"BTN_LT5"},{"physicalButton":"BTN_LT6"},{"physicalButton":"BTN_RF3"},{"physicalButton":"BTN_RF4"},{"physicalButton":"BTN_RF5"},{"physicalButton":"BTN_RF6"},{"physicalButton":"BTN_RF7"},{"physicalButton":"BTN_RF8"},{"physicalButton":"BTN_RF9"},{"physicalButton":"BTN_RF10"},{"physicalButton":"BTN_RF11"},{"physicalButton":"BTN_RF12"},{"physicalButton":"BTN_RF13"},{"physicalButton":"BTN_RF14"},{"physicalButton":"BTN_RF15"},{"physicalButton":"BTN_RF16"},{"physicalButton":"BTN_RT1"},{"physicalButton":"BTN_RT2"},{"physicalButton":"BTN_RT3"},{"physicalButton":"BTN_RT4"},{"physicalButton":"BTN_RT5"},{"physicalButton":"BTN_MB1"},{"physicalButton":"BTN_MB2"},{"physicalButton":"BTN_MB3"},{"physicalButton":"BTN_MB4"},{"physicalButton":"BTN_MB5"}],"rgbConfig":12,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_NES"],"menuButtonIcon":["OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_UNSPECIFIED","OUT_XB_BACK","OUT_START"]},{"modeId":"MODE_KEYBOARD","name":"Keyboard","socdPairs":[{"buttonDir1":"BTN_LF3","buttonDir2":"BTN_LF1","socdType":"SOCD_2IP"},{"buttonDir1":"BTN_LT1","buttonDir2":"BTN_RT4","socdType":"SOCD_2IP"}],"keyboardModeConfig":1,"rgbConfig":13,"layoutPlate":"LAYOUT_PLATE_EVERYTHING","applicableBackends":["COMMS_BACKEND_DINPUT"]}],"communicationBackendConfigs":[{"backendId":"COMMS_BACKEND_XINPUT","defaultModeConfig":1},{"backendId":"COMMS_BACKEND_NINTENDO_SWITCH","defaultModeConfig":1},{"backendId":"COMMS_BACKEND_DINPUT","defaultModeConfig":1},{"backendId":"COMMS_BACKEND_GAMECUBE","defaultModeConfig":1},{"backendId":"COMMS_BACKEND_N64","defaultModeConfig":6},{"backendId":"COMMS_BACKEND_NES","defaultModeConfig":12},{"backendId":"COMMS_BACKEND_SNES","defaultModeConfig":11},{"backendId":"COMMS_BACKEND_CONFIGURATOR","activationBinding":["BTN_RT2"]}],"keyboardModes":[{"buttonsToKeycodes":[{"button":"BTN_LF1","keycode":4},{"button":"BTN_LF2","keycode":5},{"button":"BTN_LF3","keycode":6},{"button":"BTN_LF4","keycode":7},{"button":"BTN_LF5","keycode":8},{"button":"BTN_LF6","keycode":9},{"button":"BTN_LF7","keycode":10},{"button":"BTN_LF8","keycode":11},{"button":"BTN_LT1","keycode":12},{"button":"BTN_LT2","keycode":13},{"button":"BTN_LT3","keycode":14},{"button":"BTN_LT4","keycode":15},{"button":"BTN_LT5","keycode":16},{"button":"BTN_LT6","keycode":17},{"button":"BTN_RF1","keycode":18},{"button":"BTN_RF2","keycode":19},{"button":"BTN_RF3","keycode":20},{"button":"BTN_RF4","keycode":21},{"button":"BTN_RF5","keycode":22},{"button":"BTN_RF6","keycode":23},{"button":"BTN_RF7","keycode":24},{"button":"BTN_RF8","keycode":25},{"button":"BTN_RF9","keycode":26},{"button":"BTN_RF10","keycode":27},{"button":"BTN_RF11","keycode":28},{"button":"BTN_RF12","keycode":29},{"button":"BTN_RF13","keycode":30},{"button":"BTN_RF14","keycode":31},{"button":"BTN_RF15","keycode":32},{"button":"BTN_RF16","keycode":33},{"button":"BTN_RT1","keycode":34},{"button":"BTN_RT2","keycode":35},{"button":"BTN_RT3","keycode":36},{"button":"BTN_RT4","keycode":37},{"button":"BTN_RT5","keycode":38}]}],"rgbConfigs":[{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LF4","color":2282478},{"button":"BTN_LT1","color":2282478},{"button":"BTN_LT2","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_RF3","color":2282478},{"button":"BTN_RF4","color":2282478},{"button":"BTN_RF5","color":2282478},{"button":"BTN_RF6","color":2282478},{"button":"BTN_RF7","color":2282478},{"button":"BTN_RF8","color":2282478},{"button":"BTN_RT1","color":2282478},{"button":"BTN_RT2","color":2282478},{"button":"BTN_RT3","color":2282478},{"button":"BTN_RT4","color":2282478},{"button":"BTN_RT5","color":2282478},{"button":"BTN_MB1","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LF4","color":2282478},{"button":"BTN_LT1","color":2282478},{"button":"BTN_LT2","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_RF3","color":2282478},{"button":"BTN_RF4","color":2282478},{"button":"BTN_RF5","color":2282478},{"button":"BTN_RF6","color":2282478},{"button":"BTN_RF7","color":2282478},{"button":"BTN_RF8","color":2282478},{"button":"BTN_RT1","color":2282478},{"button":"BTN_RT2","color":2282478},{"button":"BTN_RT3","color":2282478},{"button":"BTN_RT4","color":2282478},{"button":"BTN_RT5","color":2282478},{"button":"BTN_MB1","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LF4","color":2282478},{"button":"BTN_LT1","color":2282478},{"button":"BTN_LT2","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_RF3","color":2282478},{"button":"BTN_RF4","color":2282478},{"button":"BTN_RF5","color":2282478},{"button":"BTN_RF6","color":2282478},{"button":"BTN_RF7","color":2282478},{"button":"BTN_RF8","color":2282478},{"button":"BTN_RT1","color":2282478},{"button":"BTN_RT2","color":2282478},{"button":"BTN_RT3","color":2282478},{"button":"BTN_RT4","color":2282478},{"button":"BTN_RT5","color":2282478},{"button":"BTN_MB1","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LF5","color":2282478},{"button":"BTN_LT1","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_RF3","color":2282478},{"button":"BTN_RF4","color":2282478},{"button":"BTN_RF5","color":2282478},{"button":"BTN_RF6","color":2282478},{"button":"BTN_RF7","color":2282478},{"button":"BTN_RF8","color":2282478},{"button":"BTN_RF9","color":2282478},{"button":"BTN_RT1","color":2282478},{"button":"BTN_MB1","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF8","color":2282478},{"button":"BTN_LF7","color":2282478},{"button":"BTN_LF6","color":2282478},{"button":"BTN_LT6","color":2282478},{"button":"BTN_RF10","color":2282478},{"button":"BTN_RF11","color":2282478},{"button":"BTN_RF12","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF13","color":2282478},{"button":"BTN_RF14","color":2282478},{"button":"BTN_RF15","color":2282478},{"button":"BTN_RF5","color":2282478},{"button":"BTN_RF16","color":2282478},{"button":"BTN_MB1","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LF4","color":2282478},{"button":"BTN_LT1","color":2282478},{"button":"BTN_LT2","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_RF3","color":2282478},{"button":"BTN_RF4","color":2282478},{"button":"BTN_RF5","color":2282478},{"button":"BTN_RF6","color":2282478},{"button":"BTN_RT1","color":2282478},{"button":"BTN_MB1","color":2282478},{"button":"BTN_RF7","color":2282478},{"button":"BTN_RF8","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LF4","color":2282478},{"button":"BTN_LT1","color":2282478},{"button":"BTN_LT2","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_RF3","color":2282478},{"button":"BTN_RF4","color":2282478},{"button":"BTN_RF5","color":2282478},{"button":"BTN_RF6","color":2282478},{"button":"BTN_RF7","color":2282478},{"button":"BTN_RF8","color":2282478},{"button":"BTN_RT1","color":2282478},{"button":"BTN_RT2","color":2282478},{"button":"BTN_RT3","color":2282478},{"button":"BTN_RT4","color":2282478},{"button":"BTN_RT5","color":2282478},{"button":"BTN_MB1","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LF4","color":2282478},{"button":"BTN_LT1","color":2282478},{"button":"BTN_LT2","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_RF3","color":2282478},{"button":"BTN_RF4","color":2282478},{"button":"BTN_RF5","color":2282478},{"button":"BTN_RF6","color":2282478},{"button":"BTN_RF7","color":2282478},{"button":"BTN_RF8","color":2282478},{"button":"BTN_RT1","color":2282478},{"button":"BTN_RT2","color":2282478},{"button":"BTN_RT3","color":2282478},{"button":"BTN_RT4","color":2282478},{"button":"BTN_RT5","color":2282478},{"button":"BTN_MB1","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LF4","color":2282478},{"button":"BTN_LT1","color":2282478},{"button":"BTN_LT2","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_RF3","color":2282478},{"button":"BTN_RF5","color":2282478},{"button":"BTN_RF6","color":2282478},{"button":"BTN_RF7","color":2282478},{"button":"BTN_RF8","color":2282478},{"button":"BTN_RT1","color":2282478},{"button":"BTN_RT2","color":2282478},{"button":"BTN_RT3","color":2282478},{"button":"BTN_RT4","color":2282478},{"button":"BTN_RT5","color":2282478},{"button":"BTN_MB1","color":2282478},{"button":"BTN_LF6","color":2282478},{"button":"BTN_LF5","color":2282478},{"button":"BTN_RF13","color":2282478},{"button":"BTN_RF10","color":2282478},{"button":"BTN_RF11","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LF4","color":2282478},{"button":"BTN_LT1","color":2282478},{"button":"BTN_LT2","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_RF3","color":2282478},{"button":"BTN_RT1","color":2282478},{"button":"BTN_RT2","color":2282478},{"button":"BTN_RT3","color":2282478},{"button":"BTN_RT4","color":2282478},{"button":"BTN_RT5","color":2282478},{"button":"BTN_MB1","color":2282478},{"button":"BTN_LF5","color":2282478},{"button":"BTN_RF13","color":2282478},{"button":"BTN_LF6","color":2282478},{"button":"BTN_RF11","color":2282478},{"button":"BTN_RF10","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LT1","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_RF5","color":2282478},{"button":"BTN_RF6","color":2282478},{"button":"BTN_RT1","color":2282478},{"button":"BTN_MB1","color":2282478},{"button":"BTN_LF5","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LF5","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_MB1","color":2282478}],"animation":"RGB_ANIM_STATIC"},{"buttonColors":[{"button":"BTN_LF1","color":2282478},{"button":"BTN_LF2","color":2282478},{"button":"BTN_LF3","color":2282478},{"button":"BTN_LT1","color":2282478},{"button":"BTN_RF1","color":2282478},{"button":"BTN_RF2","color":2282478},{"button":"BTN_RF5","color":2282478},{"button":"BTN_RF6","color":2282478},{"button":"BTN_RT1","color":2282478},{"button":"BTN_MB1","color":2282478},{"button":"BTN_LF5","color":2282478}],"animation":"RGB_ANIM_STATIC"}],"defaultBackendConfig":1,"defaultUsbBackendConfig":1,"rgbBrightness":255,"defaultDashboardOption":"DASHBOARD_MENU_BUTTON_HINTS"}`;
 
 // ---------------------------------------------------------------------------
